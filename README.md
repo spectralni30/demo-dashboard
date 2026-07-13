@@ -24,7 +24,6 @@ PhytoLens is a state-of-the-art geospatial dashboard designed for crop health mo
 ### 3. Land Use / Land Cover (LULC) Classification
 *   Map and evaluate land classification using:
     *   **ESA WorldCover** (10m global land cover).
-    *   **IO LULC Annual v02** (10m global land cover from Impact Observatory).
 *   Automatic area calculations (in square kilometers) for forests, cropland, grassland, water bodies, built-up areas, and bare land.
 
 ### 4. SAR Flood Detection
