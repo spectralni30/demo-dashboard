@@ -1,0 +1,18 @@
+fastapi
+uvicorn
+pydantic
+pystac-client
+planetary-computer
+rasterio
+numpy
+pandas
+scikit-learn
+scipy
+pillow
+requests
+# Evapotranspiration (SEBAL) — ERA5-Land meteorology from Copernicus CDS.
+# cdsapi needs a personal access token in ~/.cdsapirc; xarray+netCDF4 read the
+# retrieved ERA5-Land .nc files.
+cdsapi
+xarray
+netCDF4

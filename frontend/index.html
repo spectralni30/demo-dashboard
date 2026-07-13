@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="https://img.icons8.com/cyber/50/satellite.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="PhytoLens is a remote sensing analytics engine powered by Microsoft Planetary Computer. Real-time index computations, LULC classifier machine learning models, and Sentinel-1 SAR landslide hazard scans." />
+    <title>PhytoLens Remote Sensing Analytics Engine</title>
+    <script>
+      // Default to light mode; respect saved user preference (new key: theme_pref)
+      (function () {
+        try {
+          localStorage.removeItem('theme'); // clear stale key from old version
+          var saved = localStorage.getItem('theme_pref');
+          document.documentElement.setAttribute('data-theme', saved || 'light');
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
+  </head>
+  <body style="margin: 0; padding: 0;">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

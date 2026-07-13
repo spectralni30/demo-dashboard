@@ -1,0 +1,68 @@
+{
+  "layers": [
+    {
+      "id": "asc",
+      "name": "Ascending",
+      "png": "data/asc.png",
+      "bin": "data/asc.bin",
+      "width": 3329,
+      "height": 1905,
+      "bounds": [
+        [
+          20.37163899999999,
+          66.08283300000001
+        ],
+        [
+          39.421639,
+          99.37283300000009
+        ]
+      ],
+      "stats": {
+        "min": -126.53,
+        "max": 105.38,
+        "mean": -0.43,
+        "median": -0.29,
+        "valid_pct": 15.4
+      }
+    },
+    {
+      "id": "dsc",
+      "name": "Descending",
+      "png": "data/dsc.png",
+      "bin": "data/dsc.bin",
+      "width": 3415,
+      "height": 1976,
+      "bounds": [
+        [
+          19.58355599999999,
+          66.169724
+        ],
+        [
+          39.343556,
+          100.31972400000005
+        ]
+      ],
+      "stats": {
+        "min": -126.74,
+        "max": 119.25,
+        "mean": -0.55,
+        "median": 0.22,
+        "valid_pct": 12.8
+      }
+    }
+  ],
+  "scales": {
+    "asc": {
+      "vmin": -21.0,
+      "vmax": 21.0,
+      "units": "mm/yr",
+      "cmap": "RdBu_r"
+    },
+    "dsc": {
+      "vmin": -21.0,
+      "vmax": 21.0,
+      "units": "mm/yr",
+      "cmap": "PiYG_r"
+    }
+  }
+}
