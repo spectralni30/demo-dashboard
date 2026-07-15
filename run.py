@@ -13,6 +13,7 @@ Press Ctrl+C once to stop both servers cleanly.
 import os
 import sys
 import re
+import json
 import signal
 import shutil
 import subprocess
@@ -21,6 +22,8 @@ import atexit
 # --- Configuration -----------------------------------------------------------
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
+BACKEND_DIR = os.path.join(PROJECT_ROOT, "backend")
+VENV_DIR = os.path.join(BACKEND_DIR, "venv")
 
 BACKEND_HOST = "127.0.0.1"
 BACKEND_PORT = 7000          # must match API_BASE in frontend/src/App.jsx
@@ -29,6 +32,33 @@ FRONTEND_PORT = 6173         # Vite dev server
 IS_WINDOWS = os.name == "nt"
 procs = []                   # child processes to clean up
 
+# Map package names to importable module names where they differ
+PACKAGE_TO_MODULE = {
+    "pystac-client": "pystac_client",
+    "planetary-computer": "planetary_computer",
+    "scikit-learn": "sklearn",
+    "pillow": "PIL",
+}
+
+# Run inside the venv to report each module as ok / missing / broken. Importing
+# them in *this* process would test the launcher's interpreter, not the venv's.
+_CHECK_SRC = r"""
+import importlib, json, sys
+out = {}
+for name in sys.argv[1:]:
+    try:
+        importlib.import_module(name)
+        out[name] = "ok"
+    except ImportError:
+        out[name] = "missing"
+    except Exception as e:
+        # Installed but unimportable — typically a C extension built against a
+        # different numpy ABI ("numpy.dtype size changed"), which raises
+        # ValueError rather than ImportError.
+        out[name] = "broken: %s" % e
+print(json.dumps(out))
+"""
+
 
 # --- Helpers -----------------------------------------------------------------
 def fail(msg):
@@ -36,47 +66,108 @@ def fail(msg):
     sys.exit(1)
 
 
-def ensure_backend_deps():
-    """Verify and install python dependencies if any are missing."""
+def venv_python():
+    """Path to the backend venv's interpreter."""
+    if IS_WINDOWS:
+        return os.path.join(VENV_DIR, "Scripts", "python.exe")
+    return os.path.join(VENV_DIR, "bin", "python")
+
+
+def ensure_venv():
+    """Create backend/venv on first run and return its interpreter path.
+
+    The backend runs on its own venv so its geospatial stack (rasterio and the
+    PROJ/GDAL data bundled with it) is self-contained and cannot be shifted by
+    whatever happens to be installed in the ambient/system Python.
+    """
+    py = venv_python()
+    if os.path.isfile(py):
+        return py
+
+    print(f"[run.py] No backend venv found — creating one at {VENV_DIR}")
+    print("[run.py] (first run only; this takes a few minutes)")
+    try:
+        subprocess.run([sys.executable, "-m", "venv", VENV_DIR], check=True)
+    except Exception as e:
+        fail(f"Could not create the backend virtualenv: {e}")
+    if not os.path.isfile(py):
+        fail(f"Virtualenv created but no interpreter at {py}")
+
+    subprocess.run([py, "-m", "pip", "install", "--upgrade", "pip"],
+                   stdout=subprocess.DEVNULL)
+    return py
+
+
+def parse_requirements(req_file):
+    """Return [(requirement_spec, module_name)] from a requirements file."""
+    with open(req_file, "r") as f:
+        specs = [ln.strip() for ln in f
+                 if ln.strip() and not ln.strip().startswith("#")]
+    out = []
+    for spec in specs:
+        # Base package name, e.g. "pydantic>=2.0" -> "pydantic"
+        pkg = re.split(r"[<>=!]", spec)[0].strip()
+        out.append((spec, PACKAGE_TO_MODULE.get(pkg.lower(), pkg)))
+    return out
+
+
+def check_imports(py, modules):
+    """Import `modules` inside `py`; return {module: 'ok'|'missing'|'broken: …'}."""
+    result = subprocess.run([py, "-c", _CHECK_SRC, *modules],
+                            capture_output=True, text=True)
+    try:
+        return json.loads(result.stdout.strip().splitlines()[-1])
+    except Exception:
+        fail("Could not verify backend dependencies — the venv interpreter "
+             f"failed to run:\n{result.stderr.strip()}")
+
+
+def ensure_backend_deps(py):
+    """Verify and install the backend's dependencies inside the venv."""
     print("[run.py] Verifying backend Python dependencies...")
-    req_file = os.path.join(PROJECT_ROOT, "backend", "requirements.txt")
+    req_file = os.path.join(BACKEND_DIR, "requirements.txt")
     if not os.path.isfile(req_file):
         print(f"[run.py] WARNING: {req_file} not found. Skipping dependency check.")
         return
 
-    # Read requirements.txt
-    with open(req_file, "r") as f:
-        requirements = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
+    reqs = parse_requirements(req_file)
+    status = check_imports(py, [mod for _, mod in reqs])
 
-    # Map package names to importable module names where they differ
-    package_to_module = {
-        "pystac-client": "pystac_client",
-        "planetary-computer": "planetary_computer",
-        "scikit-learn": "sklearn",
-        "pillow": "PIL"
-    }
+    missing = [spec for spec, mod in reqs if status.get(mod) == "missing"]
+    broken = [spec for spec, mod in reqs
+              if str(status.get(mod, "")).startswith("broken")]
+    for spec, mod in reqs:
+        if str(status.get(mod, "")).startswith("broken"):
+            print(f"[run.py] '{spec}' is installed but failed to import: "
+                  f"{status[mod][8:]}")
 
-    missing_packages = []
-    for req in requirements:
-        # Extract the base package name (e.g. pydantic>=2.0 -> pydantic)
-        pkg_name = re.split(r'[<>=!]', req)[0].strip()
-        module_name = package_to_module.get(pkg_name.lower(), pkg_name)
-        try:
-            __import__(module_name)
-        except ImportError:
-            missing_packages.append(req)
-
-    if missing_packages:
-        print(f"[run.py] Missing/unsatisfied Python dependencies: {', '.join(missing_packages)}")
-        print("[run.py] Running pip install...")
-        try:
-            cmd = [sys.executable, "-m", "pip", "install", "-r", req_file]
-            subprocess.run(cmd, check=True)
-            print("[run.py] All Python dependencies successfully installed.")
-        except Exception as e:
-            fail(f"Failed to install python requirements: {e}")
-    else:
+    if not missing and not broken:
         print("[run.py] All backend Python dependencies are satisfied.")
+        return
+
+    if missing:
+        print(f"[run.py] Missing Python dependencies: {', '.join(missing)}")
+    if broken:
+        print(f"[run.py] Broken Python dependencies: {', '.join(broken)}")
+    print("[run.py] Running pip install (into backend/venv)...")
+    try:
+        subprocess.run([py, "-m", "pip", "install", "-r", req_file], check=True)
+        print("[run.py] All Python dependencies successfully installed.")
+    except Exception as e:
+        fail(f"Failed to install python requirements: {e}")
+
+    if broken:
+        recheck = check_imports(py, [PACKAGE_TO_MODULE.get(
+            re.split(r"[<>=!]", s)[0].strip().lower(),
+            re.split(r"[<>=!]", s)[0].strip()) for s in broken])
+        still_bad = [m for m, v in recheck.items() if v != "ok"]
+        if still_bad:
+            fail("These packages are still unimportable after reinstalling:\n"
+                 f"  {', '.join(still_bad)}\n\n"
+                 "This usually means a binary/ABI mismatch with numpy. Try:\n"
+                 f"  {py} -m pip install --force-reinstall --no-cache-dir "
+                 f"{' '.join(broken)}")
+        print("[run.py] Previously broken packages now import cleanly.")
 
 
 def free_port(port):
@@ -143,16 +234,23 @@ def ensure_frontend_deps(npm):
                        shell=IS_WINDOWS)
 
 
-def start_backend():
+def start_backend(py):
     """uvicorn must run from the project root because app.py imports 'backend.*'."""
     # Scope --reload to backend/ only. Watching the whole project root makes the
-    # reloader scan .venv and the 77 MB aef_index.parquet, which is slow and can
-    # cause it to miss changes; the frontend has its own (Vite) hot reload.
-    backend_dir = os.path.join(PROJECT_ROOT, "backend")
+    # reloader scan the 77 MB aef_index.parquet, which is slow and can cause it
+    # to miss changes; the frontend has its own (Vite) hot reload. backend/venv
+    # is excluded for the same reason — thousands of files, none of them ours.
+    #
+    # Pass the venv as a bare directory, NOT a "venv/*" glob: uvicorn's CLI is
+    # click-based, and click expands glob patterns in argv itself on Windows, so
+    # "venv/*" arrives pre-expanded into its matching paths and uvicorn aborts
+    # with "Got unexpected extra arguments". uvicorn treats an exclude that is an
+    # existing directory as "ignore everything under it", which is what we want.
     cmd = [
-        sys.executable, "-m", "uvicorn", "backend.app:app",
+        py, "-m", "uvicorn", "backend.app:app",
         "--host", BACKEND_HOST, "--port", str(BACKEND_PORT),
-        "--reload", "--reload-dir", backend_dir,
+        "--reload", "--reload-dir", BACKEND_DIR,
+        "--reload-exclude", VENV_DIR,
     ]
     print(f"[run.py] Starting backend:  {' '.join(cmd)}")
     return subprocess.Popen(cmd, cwd=PROJECT_ROOT)
@@ -182,7 +280,9 @@ def terminate_all():
 
 # --- Main --------------------------------------------------------------------
 def main():
-    ensure_backend_deps()
+    py = ensure_venv()
+    print(f"[run.py] Backend interpreter: {py}")
+    ensure_backend_deps(py)
     npm = npm_executable()
     ensure_frontend_deps(npm)
 
@@ -192,7 +292,7 @@ def main():
 
     atexit.register(terminate_all)
 
-    procs.append(start_backend())
+    procs.append(start_backend(py))
     procs.append(start_frontend(npm))
 
     print("\n" + "=" * 56)

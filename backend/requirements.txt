@@ -1,11 +1,19 @@
 fastapi
 uvicorn
+# run.py starts uvicorn with --reload. Without watchfiles, uvicorn falls back to
+# StatReload, which ignores --reload-exclude and rglob()s every *.py under
+# backend/ on each tick — i.e. all ~5k files in backend/venv, every 0.25s.
+watchfiles
 pydantic
 pystac-client
 planetary-computer
 rasterio
 numpy
 pandas
+# pandas needs an engine to read aef_index.parquet (backend/app.py). It is not a
+# pandas dependency, so without this the parquet-backed endpoints raise
+# "Unable to find a usable engine" — which only shows up in a clean venv.
+pyarrow
 scikit-learn
 scipy
 pillow
@@ -15,4 +23,7 @@ requests
 # retrieved ERA5-Land .nc files.
 cdsapi
 xarray
-netCDF4
+# netCDF4 < 1.7.2 has no numpy 2.x wheels; its C extension was built against the
+# numpy 1.x ABI and importing it under numpy 2 raises
+# "ValueError: numpy.dtype size changed" instead of a plain ImportError.
+netCDF4>=1.7.2
