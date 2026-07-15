@@ -53,10 +53,36 @@ python run.py
 ```
 
 This command will:
-1. Check and install missing Python packages from `backend/requirements.txt`.
-2. Check and run `npm install` inside the `frontend/` directory.
-3. Automatically free up ports `7000` (Backend) and `6173` (Frontend) if they are currently locked.
-4. Launch both servers in parallel and output hot-reloading logs in the terminal.
+1. Create a dedicated virtualenv at `backend/venv` on first run (takes a few minutes).
+2. Check and install missing Python packages from `backend/requirements.txt` **into that venv**.
+3. Check and run `npm install` inside the `frontend/` directory.
+4. Automatically free up ports `7000` (Backend) and `6173` (Frontend) if they are currently locked.
+5. Launch both servers in parallel and output hot-reloading logs in the terminal.
+
+The backend always runs on `backend/venv`, never on the ambient/system Python — so
+its geospatial stack (rasterio, and the PROJ/GDAL data bundled with it) is
+self-contained and reproducible. You do not need to activate the venv yourself;
+`run.py` invokes it by path. To run the backend directly without the launcher:
+
+```bash
+# Windows
+backend\venv\Scripts\python -m uvicorn backend.app:app --port 7000
+# macOS / Linux
+backend/venv/bin/python -m uvicorn backend.app:app --port 7000
+```
+
+Run it from the **project root** (not from `backend/`) — `backend/app.py` imports
+`backend.*`, and the package's `__init__` is what isolates PROJ (see below).
+
+> **Note — PROJ / PostGIS conflict on Windows.** The PostgreSQL/PostGIS installer sets
+> machine-wide `PROJ_LIB` and `GDAL_DATA` variables pointing at its own (older) PROJ
+> data. Every process inherits them, and rasterio honours `PROJ_LIB` when set, so EPSG
+> lookups fail with *"proj.db contains DATABASE.LAYOUT.VERSION.MINOR = 2 whereas a
+> number >= 5 is expected"*. A venv does **not** fix this on its own — it does not
+> scrub environment variables. `backend/_proj_env.py` drops those inherited vars at
+> import time so rasterio falls back to its own bundled PROJ data. It runs from
+> `backend/__init__.py`, before anything imports rasterio, because PROJ reads those
+> vars once at C-library init.
 
 Once started, navigate to:
 *   **Frontend Web App**: `http://localhost:6173`
@@ -70,10 +96,13 @@ Once started, navigate to:
 ```
 demo-dashboard/
 ├── backend/                # FastAPI Application
+│   ├── __init__.py         # Package init — isolates PROJ before rasterio loads
+│   ├── _proj_env.py        # Drops inherited PostGIS PROJ_LIB/GDAL_DATA vars
 │   ├── app.py              # Main API routes (Spectral, LULC, Flood, ET)
 │   ├── pc_handler.py       # Planetary Computer client wrappers (STAC search, band-alignment)
 │   ├── sebal.py            # Evapotranspiration Energy Balance math
-│   └── requirements.txt    # Python packages
+│   ├── requirements.txt    # Python packages
+│   └── venv/               # Backend's own virtualenv (git-ignored, created by run.py)
 ├── frontend/               # React Dashboard (Vite)
 │   ├── src/
 │   │   ├── App.jsx         # Dashboard components & Leaflet map integration
