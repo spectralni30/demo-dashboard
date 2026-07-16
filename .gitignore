@@ -72,6 +72,9 @@ backend/static/
 ## ~95 MiB, just under GitHub's 100 MiB hard limit; do not let it grow past that.
 !/INDIA_NATIONAL_HIGHWAY.geojson
 
+## Climate Atlas district boundaries geojson
+!/frontend/public/climate/districts.geojson
+
 # Large Data Files
 aef_index.parquet
 
