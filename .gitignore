@@ -68,6 +68,9 @@ backend/static/
 !**/package.json
 !**/package-lock.json
 !frontend/public/**/*.json
+## Full-resolution NH network — source of truth for all highway analysis.
+## ~95 MiB, just under GitHub's 100 MiB hard limit; do not let it grow past that.
+!/INDIA_NATIONAL_HIGHWAY.geojson
 
 # Large Data Files
 aef_index.parquet
