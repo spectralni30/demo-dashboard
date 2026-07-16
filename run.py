@@ -73,6 +73,64 @@ def venv_python():
     return os.path.join(VENV_DIR, "bin", "python")
 
 
+def venv_is_usable(py):
+    """True if `py` exists and has a working pip.
+
+    A venv whose creation died partway (e.g. Debian's missing ensurepip) still
+    leaves bin/python behind, so the interpreter existing is not enough — we
+    would sail past creation and fail later on every pip call.
+    """
+    if not os.path.isfile(py):
+        return False
+    return subprocess.run([py, "-m", "pip", "--version"],
+                          stdout=subprocess.DEVNULL,
+                          stderr=subprocess.DEVNULL).returncode == 0
+
+
+def venv_missing_ensurepip_hint():
+    """Install hint for distros that ship venv without ensurepip (Debian/Ubuntu)."""
+    ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+    return (
+        "Your Python has the 'venv' module but not 'ensurepip', so it cannot "
+        "create a virtualenv with pip in it.\n"
+        "This is normal on Debian/Ubuntu — the piece lives in a separate "
+        "package. Install it and re-run:\n\n"
+        f"    sudo apt install python{ver}-venv\n\n"
+        f"    python run.py"
+    )
+
+
+def create_venv():
+    """Build backend/venv, cleaning up after a failed attempt.
+
+    Tries the stdlib `venv` first and falls back to the `virtualenv` tool, which
+    vendors its own pip and therefore works even where ensurepip is absent.
+    """
+    result = subprocess.run([sys.executable, "-m", "venv", VENV_DIR],
+                            capture_output=True, text=True)
+    if result.returncode == 0 and venv_is_usable(venv_python()):
+        return
+
+    # Leave no half-built venv behind: it would fool the next run into skipping
+    # creation entirely.
+    shutil.rmtree(VENV_DIR, ignore_errors=True)
+
+    no_ensurepip = "ensurepip is not available" in (result.stderr or "")
+    if no_ensurepip and shutil.which("virtualenv"):
+        print("[run.py] 'python -m venv' is unusable here (no ensurepip) — "
+              "falling back to 'virtualenv'.")
+        fallback = subprocess.run(["virtualenv", "-p", sys.executable, VENV_DIR],
+                                  capture_output=True, text=True)
+        if fallback.returncode == 0 and venv_is_usable(venv_python()):
+            return
+        shutil.rmtree(VENV_DIR, ignore_errors=True)
+
+    if no_ensurepip:
+        fail(venv_missing_ensurepip_hint())
+    fail("Could not create the backend virtualenv at "
+         f"{VENV_DIR}\n\n{(result.stderr or '').strip()}")
+
+
 def ensure_venv():
     """Create backend/venv on first run and return its interpreter path.
 
@@ -81,18 +139,20 @@ def ensure_venv():
     whatever happens to be installed in the ambient/system Python.
     """
     py = venv_python()
-    if os.path.isfile(py):
+    if venv_is_usable(py):
         return py
 
-    print(f"[run.py] No backend venv found — creating one at {VENV_DIR}")
+    if os.path.isfile(py):
+        print(f"[run.py] Backend venv at {VENV_DIR} has no working pip — "
+              "rebuilding it.")
+        shutil.rmtree(VENV_DIR, ignore_errors=True)
+    else:
+        print(f"[run.py] No backend venv found — creating one at {VENV_DIR}")
     print("[run.py] (first run only; this takes a few minutes)")
-    try:
-        subprocess.run([sys.executable, "-m", "venv", VENV_DIR], check=True)
-    except Exception as e:
-        fail(f"Could not create the backend virtualenv: {e}")
-    if not os.path.isfile(py):
-        fail(f"Virtualenv created but no interpreter at {py}")
 
+    create_venv()
+
+    py = venv_python()
     subprocess.run([py, "-m", "pip", "install", "--upgrade", "pip"],
                    stdout=subprocess.DEVNULL)
     return py
