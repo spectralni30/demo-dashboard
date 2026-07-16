@@ -185,8 +185,8 @@ body,
   border-bottom: none;
   background: linear-gradient(90deg, #0BAFAF 0%, #088f8f 100%);
   padding: 0 20px;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 16px;
   z-index: 1000;
@@ -3356,4 +3356,20 @@ input[type="range"] {
   color: var(--text-3);
   margin-top: 8px;
   line-height: 1.45;
+}
+
+/* Responsive header styles to prevent overlap on smaller screens */
+@media (max-width: 1250px) {
+  .hud-control-label {
+    display: none !important;
+  }
+  .appbar-tab {
+    padding: 5px 8px !important;
+    font-size: 0.75rem !important;
+    gap: 4px !important;
+  }
+  .appbar-tab-group {
+    padding: 3px !important;
+    gap: 1px !important;
+  }
 }

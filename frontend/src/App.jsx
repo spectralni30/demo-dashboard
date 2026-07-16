@@ -722,16 +722,16 @@ function TimeSeriesChart({ data, indexName, onViewScene, activeSceneId }) {
 // SVG Donut Chart
 // LSM 5-class Viridis palette + labels, shared by the district donut and the
 // highway-wise corridor analysis (class 0 = outside the model's study area).
-const LSM_CLASS_COLORS = { 0: '#9ca3af', 1: '#440154', 2: '#3b528b', 3: '#21918c', 4: '#5ec962', 5: '#fde725' };
+const LSM_CLASS_COLORS = { 0: '#9ca3af', 1: '#3b82f6', 2: '#10b981', 3: '#eab308', 4: '#f97316', 5: '#ef4444' };
 const LSM_CLASS_LABELS = { 0: 'Not Analysed', 1: 'Very Low', 2: 'Low', 3: 'Moderate', 4: 'High', 5: 'Very High' };
 
 function DonutChart({ stats, analyzedPercent = 72, centerLabel = 'Area Analyzed' }) {
   const data = [
-    { label: 'Very High', value: stats['5'] !== undefined ? stats['5'] : 12.4, color: '#fde725' },
-    { label: 'High', value: stats['4'] !== undefined ? stats['4'] : 18.7, color: '#5ec962' },
-    { label: 'Moderate', value: stats['3'] !== undefined ? stats['3'] : 24.1, color: '#21918c' },
-    { label: 'Low', value: stats['2'] !== undefined ? stats['2'] : 28.6, color: '#3b528b' },
-    { label: 'Very Low', value: stats['1'] !== undefined ? stats['1'] : 16.2, color: '#440154' }
+    { label: 'Very High', value: stats['5'] !== undefined ? stats['5'] : 12.4, color: '#ef4444' },
+    { label: 'High', value: stats['4'] !== undefined ? stats['4'] : 18.7, color: '#f97316' },
+    { label: 'Moderate', value: stats['3'] !== undefined ? stats['3'] : 24.1, color: '#eab308' },
+    { label: 'Low', value: stats['2'] !== undefined ? stats['2'] : 28.6, color: '#10b981' },
+    { label: 'Very Low', value: stats['1'] !== undefined ? stats['1'] : 16.2, color: '#3b82f6' }
   ];
 
   const total = data.reduce((sum, item) => sum + item.value, 0);
@@ -1780,10 +1780,20 @@ function App() {
     (lsmHighwaySegments.segments || []).forEach(seg => {
       if (!seg.pts || seg.pts.length < 2) return;
       const isGap = seg.c === 0; // outside the susceptibility model's study area
+      
+      // Black background line to act as an outline/border for high visibility
+      const outline = L.polyline(seg.pts, {
+        color: '#000000',
+        weight: isGap ? 4.5 : 8,
+        opacity: 0.8,
+        interactive: false
+      });
+      outline.addTo(group);
+
       const line = L.polyline(seg.pts, {
         color: LSM_CLASS_COLORS[seg.c] || LSM_CLASS_COLORS[0],
         weight: isGap ? 2.5 : 5,
-        opacity: isGap ? 0.5 : 0.95,
+        opacity: isGap ? 0.6 : 1.0,
         dashArray: isGap ? '4 7' : null
       });
       line.bindTooltip(
@@ -2919,25 +2929,27 @@ function App() {
 
   // Update base tiles — Climate Anomaly Atlas forces the light CARTO basemap
   // (needed for choropleth fill contrast) regardless of the global toggle,
-  // and restores whichever of satellite/streets the toggle dictates on exit.
+  // and restores whichever of satellite/streets/light the toggle dictates on exit.
   useEffect(() => {
     if (mapRef.current && baseTilesRef.current) {
       const map = mapRef.current;
       const { satellite, streets, light } = baseTilesRef.current;
 
-      if (analysisMode === "climate") {
-        if (map.hasLayer(satellite)) map.removeLayer(satellite);
-        if (map.hasLayer(streets)) map.removeLayer(streets);
-        if (!map.hasLayer(light)) light.addTo(map);
-        return;
-      }
+      // First remove all existing base layers to avoid overlay issues
+      if (map.hasLayer(satellite)) map.removeLayer(satellite);
+      if (map.hasLayer(streets)) map.removeLayer(streets);
       if (map.hasLayer(light)) map.removeLayer(light);
 
+      if (analysisMode === "climate") {
+        light.addTo(map);
+        return;
+      }
+
       if (baseMap === "satellite") {
-        map.removeLayer(streets);
         satellite.addTo(map);
+      } else if (baseMap === "light") {
+        light.addTo(map);
       } else {
-        map.removeLayer(satellite);
         streets.addTo(map);
       }
     }
@@ -4134,7 +4146,7 @@ function App() {
 
       {/* APP HEADER */}
       <header className="hud-header">
-        <div className="hud-title">
+        <div className="hud-title" style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
           <span className="logo-chip">
             <img src={`${import.meta.env.BASE_URL}logo.png`} alt="PhytoLens Logo" className="hud-logo-img" />
           </span>
@@ -4142,7 +4154,7 @@ function App() {
 
         <div
           ref={modeDropdownRef}
-          style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', zIndex: 1001 }}
+          style={{ zIndex: 1001, display: 'flex', justifyContent: 'center', alignItems: 'center' }}
         >
           <div className="appbar-tab-group">
             {FEATURE_GROUPS.map((g, i) => {
@@ -4164,7 +4176,7 @@ function App() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4" style={{ justifyContent: 'flex-end', width: '100%' }}>
           {/* Global Map Controls */}
           <div className="flex items-center gap-3 bg-slate-900/40 px-3 py-1.5 rounded border border-cyan-500/10" style={{ position: 'relative' }}>
             <div className="dropdown-parent">
@@ -4231,7 +4243,20 @@ function App() {
               )}
             </div>
             <div style={{ borderLeft: '1px solid var(--border-color)', height: '14px', margin: '0 4px' }}></div>
-            <span className="text-[10px] text-slate-500 font-bold select-none">OPACITY:</span>
+            <span className="text-[10px] text-slate-500 font-bold select-none hud-control-label">BASEMAP:</span>
+            <select
+              value={analysisMode === "climate" ? "light" : baseMap}
+              disabled={analysisMode === "climate"}
+              onChange={e => setBaseMap(e.target.value)}
+              className="bg-slate-900/80 text-slate-300 border border-slate-700/60 rounded px-1.5 py-0.5 text-[10px] font-bold focus:outline-none focus:border-cyan-500/50 cursor-pointer"
+              style={{ marginRight: '2px' }}
+            >
+              <option value="satellite">Satellite</option>
+              <option value="light">Light Map</option>
+              <option value="streets">Streets</option>
+            </select>
+            <div style={{ borderLeft: '1px solid var(--border-color)', height: '14px', margin: '0 4px' }}></div>
+            <span className="text-[10px] text-slate-500 font-bold select-none hud-control-label">OPACITY:</span>
             <input 
               type="range" min="0.1" max="1.0" step="0.1" 
               value={overlayOpacity} 
@@ -6978,9 +7003,9 @@ function App() {
               {analysisMode === "lsm" && activeLsmOverlay === "classes" && (
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '2px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', fontWeight: '600', color: 'var(--text-main)' }}>
-                    <span>Susceptibility Classes (Viridis)</span>
+                    <span>Susceptibility Classes</span>
                   </div>
-                  <div style={{ height: '8px', width: '100%', borderRadius: '2px', background: 'linear-gradient(90deg, #440154, #3b528b, #21918c, #5ec962, #fde725)' }}></div>
+                  <div style={{ height: '8px', width: '100%', borderRadius: '2px', background: 'linear-gradient(90deg, #3b82f6, #10b981, #eab308, #f97316, #ef4444)' }}></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '8px', color: 'var(--text-muted)' }}>
                     <span>Class 1 (Very Low)</span>
                     <span>Class 5 (Very High)</span>

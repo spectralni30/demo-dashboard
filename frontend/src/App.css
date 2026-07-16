@@ -185,17 +185,17 @@
 
 /* LSM SUSCEPTIBILITY MAP OVERRIDES AND STYLES */
 :root {
-  --c-veryhigh: #fde725;
-  --c-high: #5ec962;
-  --c-medium: #21918c;
-  --c-low: #3b528b;
-  --c-verylow: #440154;
+  --c-veryhigh: #ef4444;
+  --c-high: #f97316;
+  --c-medium: #eab308;
+  --c-low: #10b981;
+  --c-verylow: #3b82f6;
 }
 
 /* Susceptibility Colors badges */
-.badge-veryhigh { background-color: var(--c-veryhigh) !important; color: #000000 !important; }
-.badge-high { background-color: var(--c-high) !important; color: #000000 !important; }
-.badge-medium { background-color: var(--c-medium) !important; color: #ffffff !important; }
+.badge-veryhigh { background-color: var(--c-veryhigh) !important; color: #ffffff !important; }
+.badge-high { background-color: var(--c-high) !important; color: #ffffff !important; }
+.badge-medium { background-color: var(--c-medium) !important; color: #000000 !important; }
 .badge-low { background-color: var(--c-low) !important; color: #ffffff !important; }
 .badge-verylow { background-color: var(--c-verylow) !important; color: #ffffff !important; }
 
@@ -463,33 +463,33 @@
 }
 
 .result-badge.badge-verylow {
-  background: rgba(68, 1, 84, 0.15);
-  color: #a27cf6;
-  border: 1px solid rgba(68, 1, 84, 0.35);
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.35);
 }
 
 .result-badge.badge-low {
-  background: rgba(59, 82, 139, 0.15);
-  color: #7d9df5;
-  border: 1px solid rgba(59, 82, 139, 0.35);
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
 }
 
 .result-badge.badge-medium {
-  background: rgba(33, 145, 140, 0.15);
-  color: #38bdf8;
-  border: 1px solid rgba(33, 145, 140, 0.35);
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.35);
 }
 
 .result-badge.badge-high {
-  background: rgba(94, 201, 98, 0.15);
-  color: #4ade80;
-  border: 1px solid rgba(94, 201, 98, 0.35);
+  background: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.35);
 }
 
 .result-badge.badge-veryhigh {
-  background: rgba(253, 231, 37, 0.15);
-  color: #fde725;
-  border: 1px solid rgba(253, 231, 37, 0.35);
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 .popup-error {
