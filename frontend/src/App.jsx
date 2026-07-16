@@ -4242,19 +4242,7 @@ function App() {
                 </div>
               )}
             </div>
-            <div style={{ borderLeft: '1px solid var(--border-color)', height: '14px', margin: '0 4px' }}></div>
-            <span className="text-[10px] text-slate-500 font-bold select-none hud-control-label">BASEMAP:</span>
-            <select
-              value={analysisMode === "climate" ? "light" : baseMap}
-              disabled={analysisMode === "climate"}
-              onChange={e => setBaseMap(e.target.value)}
-              className="bg-slate-900/80 text-slate-300 border border-slate-700/60 rounded px-1.5 py-0.5 text-[10px] font-bold focus:outline-none focus:border-cyan-500/50 cursor-pointer"
-              style={{ marginRight: '2px' }}
-            >
-              <option value="satellite">Satellite</option>
-              <option value="light">Light Map</option>
-              <option value="streets">Streets</option>
-            </select>
+
             <div style={{ borderLeft: '1px solid var(--border-color)', height: '14px', margin: '0 4px' }}></div>
             <span className="text-[10px] text-slate-500 font-bold select-none hud-control-label">OPACITY:</span>
             <input 
@@ -5646,6 +5634,20 @@ function App() {
 
           <div className="map-container">
             <div id="leaflet-map" ref={mapContainerRef}></div>
+
+            {/* Floating Basemap Selector Widget */}
+            <div className="floating-basemap-control">
+              <Layers size={11} style={{ color: 'var(--accent-sky, #0bafaf)' }} />
+              <select
+                value={analysisMode === "climate" ? "light" : baseMap}
+                disabled={analysisMode === "climate"}
+                onChange={e => setBaseMap(e.target.value)}
+              >
+                <option value="satellite">Satellite</option>
+                <option value="light">Light Map</option>
+                <option value="streets">Streets</option>
+              </select>
+            </div>
           </div>
 
           {/* FLOOD VERTICAL SWIPE DIVIDER (on map): left = post-event, right = pre-event */}
