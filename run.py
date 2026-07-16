@@ -286,6 +286,69 @@ def npm_executable():
     return npm
 
 
+def node_version():
+    """Return the Node major/minor on PATH as (major, minor), or None."""
+    node = shutil.which("node")
+    if not node:
+        return None
+    try:
+        out = subprocess.run([node, "--version"], capture_output=True,
+                             text=True, check=True).stdout.strip()
+    except Exception:
+        return None
+    m = re.match(r"v?(\d+)\.(\d+)", out)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def node_upgrade_hint():
+    """Install instructions for the platform we're actually running on."""
+    if IS_WINDOWS:
+        return ("Install Node 22 LTS from https://nodejs.org, or via a package "
+                "manager:\n\n"
+                "    winget install OpenJS.NodeJS.LTS\n\n"
+                "Then open a new terminal so PATH picks it up.")
+    if sys.platform == "darwin":
+        return ("Install Node 22 LTS from https://nodejs.org, or:\n\n"
+                "    brew install node@22\n\n"
+                "…or with nvm (run each line separately):\n\n"
+                "    nvm install 22\n"
+                "    nvm alias default 22")
+    return ("Install Node 22 with nvm (run each line separately — do NOT paste "
+            "them as one block, since 'exec $SHELL' would swallow the rest):\n\n"
+            "    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash\n"
+            "    export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\"\n"
+            "    nvm install 22\n"
+            "    nvm alias default 22\n\n"
+            "…or system-wide on Debian/Ubuntu via NodeSource:\n\n"
+            "    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -\n"
+            "    sudo apt install -y nodejs")
+
+
+def ensure_node():
+    """Fail early if Node is too old for Vite.
+
+    Vite requires ^20.19 || >=22.12. On an older Node it does not degrade — it
+    dies with a bare 'CustomEvent is not defined' (a global that only exists
+    from Node 19 on), which says nothing about the actual problem. Checking here
+    means we report it before starting the backend, rather than booting a server
+    and then tearing it down when the frontend dies.
+    """
+    ver = node_version()
+    if ver is None:
+        return  # npm_executable() already covers a missing toolchain
+    major, minor = ver
+    # Vite's supported range: ^20.19 || >=22.12 (note 21.x is not supported).
+    supported = ((major == 20 and minor >= 19)
+                 or (major == 22 and minor >= 12)
+                 or major >= 23)
+    if supported:
+        return
+    fail(f"Node.js {major}.{minor} is too old — Vite needs 20.19+ or 22.12+ "
+         f"(Node 18 reached end-of-life in April 2025).\n\n"
+         f"{node_upgrade_hint()}\n\n"
+         "Then re-run:  python run.py")
+
+
 def ensure_frontend_deps(npm):
     """Run `npm install` once if node_modules is missing."""
     if not os.path.isdir(os.path.join(FRONTEND_DIR, "node_modules")):
@@ -344,6 +407,7 @@ def main():
     print(f"[run.py] Backend interpreter: {py}")
     ensure_backend_deps(py)
     npm = npm_executable()
+    ensure_node()
     ensure_frontend_deps(npm)
 
     # Make sure no leftover servers from a previous run are holding the ports.
