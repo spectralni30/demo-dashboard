@@ -116,14 +116,24 @@ def create_venv():
     shutil.rmtree(VENV_DIR, ignore_errors=True)
 
     no_ensurepip = "ensurepip is not available" in (result.stderr or "")
-    if no_ensurepip and shutil.which("virtualenv"):
-        print("[run.py] 'python -m venv' is unusable here (no ensurepip) — "
-              "falling back to 'virtualenv'.")
-        fallback = subprocess.run(["virtualenv", "-p", sys.executable, VENV_DIR],
-                                  capture_output=True, text=True)
-        if fallback.returncode == 0 and venv_is_usable(venv_python()):
-            return
-        shutil.rmtree(VENV_DIR, ignore_errors=True)
+    if no_ensurepip:
+        if not shutil.which("virtualenv"):
+            print("[run.py] 'ensurepip' is missing and 'virtualenv' is not installed.")
+            print("[run.py] Attempting to install 'virtualenv' using system pip...")
+            try:
+                subprocess.run([sys.executable, "-m", "pip", "install", "--user", "virtualenv"],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+        
+        if shutil.which("virtualenv"):
+            print("[run.py] 'python -m venv' is unusable here (no ensurepip) — "
+                  "falling back to 'virtualenv'.")
+            fallback = subprocess.run(["virtualenv", "-p", sys.executable, VENV_DIR],
+                                      capture_output=True, text=True)
+            if fallback.returncode == 0 and venv_is_usable(venv_python()):
+                return
+            shutil.rmtree(VENV_DIR, ignore_errors=True)
 
     if no_ensurepip:
         fail(venv_missing_ensurepip_hint())
@@ -176,10 +186,19 @@ def check_imports(py, modules):
     result = subprocess.run([py, "-c", _CHECK_SRC, *modules],
                             capture_output=True, text=True)
     try:
-        return json.loads(result.stdout.strip().splitlines()[-1])
+        # Search lines backwards for the JSON block to bypass any warning lines
+        json_str = None
+        for line in reversed(result.stdout.strip().splitlines()):
+            line_str = line.strip()
+            if line_str.startswith("{") and line_str.endswith("}"):
+                json_str = line_str
+                break
+        if json_str is None:
+            raise ValueError("No JSON block found in output")
+        return json.loads(json_str)
     except Exception:
         fail("Could not verify backend dependencies — the venv interpreter "
-             f"failed to run:\n{result.stderr.strip()}")
+             f"failed to run:\n{result.stderr.strip() or result.stdout.strip()}")
 
 
 def ensure_backend_deps(py):
@@ -214,7 +233,9 @@ def ensure_backend_deps(py):
         subprocess.run([py, "-m", "pip", "install", "-r", req_file], check=True)
         print("[run.py] All Python dependencies successfully installed.")
     except Exception as e:
-        fail(f"Failed to install python requirements: {e}")
+        fail(f"Failed to install python requirements: {e}\n\n"
+             "Tip: Try running the command manually inside the virtualenv to see the exact error:\n"
+             f"  {py} -m pip install -r \"{req_file}\"")
 
     if broken:
         recheck = check_imports(py, [PACKAGE_TO_MODULE.get(
