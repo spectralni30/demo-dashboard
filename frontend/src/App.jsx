@@ -720,7 +720,12 @@ function TimeSeriesChart({ data, indexName, onViewScene, activeSceneId }) {
 }
 
 // SVG Donut Chart
-function DonutChart({ stats, analyzedPercent = 72 }) {
+// LSM 5-class Viridis palette + labels, shared by the district donut and the
+// highway-wise corridor analysis (class 0 = outside the model's study area).
+const LSM_CLASS_COLORS = { 0: '#9ca3af', 1: '#440154', 2: '#3b528b', 3: '#21918c', 4: '#5ec962', 5: '#fde725' };
+const LSM_CLASS_LABELS = { 0: 'Not Analysed', 1: 'Very Low', 2: 'Low', 3: 'Moderate', 4: 'High', 5: 'Very High' };
+
+function DonutChart({ stats, analyzedPercent = 72, centerLabel = 'Area Analyzed' }) {
   const data = [
     { label: 'Very High', value: stats['5'] !== undefined ? stats['5'] : 12.4, color: '#fde725' },
     { label: 'High', value: stats['4'] !== undefined ? stats['4'] : 18.7, color: '#5ec962' },
@@ -759,7 +764,7 @@ function DonutChart({ stats, analyzedPercent = 72 }) {
         </svg>
         <div className="donut-text">
           <span className="donut-val">{analyzedPercent}%</span>
-          <span className="donut-lbl">Area Analyzed</span>
+          <span className="donut-lbl">{centerLabel}</span>
         </div>
       </div>
       <div className="donut-legend">
@@ -1198,9 +1203,21 @@ function App() {
   const [highwaysGeoJson, setHighwaysGeoJson] = useState(null);
   const highwaysLayerRef = useRef(null);
 
+  // --- LSM National Highway-wise analysis states ---
+  const [lsmFocusType, setLsmFocusType] = useState('district'); // 'district' | 'highway'
+  const [lsmHighwayStatsData, setLsmHighwayStatsData] = useState(null); // highway_stats.json rows
+  const [lsmHighwayFilter, setLsmHighwayFilter] = useState('');
+  const [lsmTempHighway, setLsmTempHighway] = useState('');
+  const [lsmBufferM, setLsmBufferM] = useState('500'); // corridor buffer in metres (each side)
+  const [lsmSelectedHighway, setLsmSelectedHighway] = useState(null); // stats row (precomputed or live)
+  const [lsmHighwaySegments, setLsmHighwaySegments] = useState(null); // { segments, buffer_polygons }
+  const [lsmHighwayLoading, setLsmHighwayLoading] = useState(false);
+
   // Refs for LSM leaflet layers
   const lsmOverlayLayerRef = useRef(null);
   const lsmDistrictBoundaryLayerRef = useRef(null);
+  const lsmHighwayLayerRef = useRef(null);
+  const lsmHighwayFlownRef = useRef(null); // last highway flown to (skip re-fly on buffer change)
   const lsmPopupRef = useRef(null);
 
   // --- Deformation Mode View States ---
@@ -1487,6 +1504,30 @@ function App() {
     return lsmDistrictsData.filter(d => d.state === lsmSelectedState);
   }, [lsmDistrictsData, lsmSelectedState]);
 
+  // Load precomputed highway LSM stats the first time highway analysis is opened
+  useEffect(() => {
+    if (analysisMode !== 'lsm' || lsmFocusType !== 'highway' || lsmHighwayStatsData) return;
+    fetch(`${import.meta.env.BASE_URL}highway_stats.json`)
+      .then(res => res.json())
+      .then(data => setLsmHighwayStatsData(data))
+      .catch(err => {
+        console.error('Error loading highway LSM stats:', err);
+        setLsmHighwayStatsData([]);
+      });
+  }, [analysisMode, lsmFocusType, lsmHighwayStatsData]);
+
+  // Highway dropdown options — filtered, naturally sorted, grouped NH vs other
+  const lsmHighwayOptions = useMemo(() => {
+    if (!lsmHighwayStatsData) return null;
+    const q = lsmHighwayFilter.trim().toLowerCase();
+    const matches = lsmHighwayStatsData.filter(h => h.name && (!q || h.name.toLowerCase().includes(q)));
+    const cmp = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    return {
+      nh: matches.filter(h => /^NH\b/i.test(h.name)).sort(cmp),
+      other: matches.filter(h => !/^NH\b/i.test(h.name)).sort(cmp),
+    };
+  }, [lsmHighwayStatsData, lsmHighwayFilter]);
+
   // Handle LSM map interactions, overlays and listeners
   useEffect(() => {
     const map = mapRef.current;
@@ -1608,6 +1649,7 @@ function App() {
         // Clear LSM map layers when leaving LSM mode
         if (lsmOverlayLayerRef.current) { map.removeLayer(lsmOverlayLayerRef.current); lsmOverlayLayerRef.current = null; }
         if (lsmDistrictBoundaryLayerRef.current) { map.removeLayer(lsmDistrictBoundaryLayerRef.current); lsmDistrictBoundaryLayerRef.current = null; }
+        if (lsmHighwayLayerRef.current) { map.removeLayer(lsmHighwayLayerRef.current); lsmHighwayLayerRef.current = null; }
         if (lsmPopupRef.current) { map.closePopup(lsmPopupRef.current); lsmPopupRef.current = null; }
       };
     }
@@ -1671,7 +1713,7 @@ function App() {
     if (highwaysGeoJson) {
       addHighwaysLayer(highwaysGeoJson);
     } else {
-      fetch(`${import.meta.env.BASE_URL}highways.geojson`)
+      fetch(`${import.meta.env.BASE_URL}highways_overlay.json`)
         .then(res => res.json())
         .then(data => {
           setHighwaysGeoJson(data);
@@ -1712,6 +1754,53 @@ function App() {
       map.flyToBounds(layer.getBounds(), { duration: 1.5, padding: [40, 40] });
     }
   }, [analysisMode, lsmDistrictGeoJson, lsmSelectedDistrict]);
+
+  // Handle LSM selected highway rendering: buffer corridor + class-coloured segments
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || analysisMode !== "lsm") return;
+
+    if (lsmHighwayLayerRef.current) {
+      map.removeLayer(lsmHighwayLayerRef.current);
+      lsmHighwayLayerRef.current = null;
+    }
+
+    if (!lsmSelectedHighway || !lsmHighwaySegments) return;
+
+    const group = L.layerGroup();
+
+    const bufferGeom = lsmHighwaySegments.buffer_polygons && lsmHighwaySegments.buffer_polygons[String(lsmBufferM)];
+    if (bufferGeom) {
+      L.geoJSON({ type: 'Feature', properties: {}, geometry: bufferGeom }, {
+        style: { color: '#94a3b8', weight: 1.2, dashArray: '4 4', fillColor: '#64748b', fillOpacity: 0.08 },
+        interactive: false
+      }).addTo(group);
+    }
+
+    (lsmHighwaySegments.segments || []).forEach(seg => {
+      if (!seg.pts || seg.pts.length < 2) return;
+      const isGap = seg.c === 0; // outside the susceptibility model's study area
+      const line = L.polyline(seg.pts, {
+        color: LSM_CLASS_COLORS[seg.c] || LSM_CLASS_COLORS[0],
+        weight: isGap ? 2.5 : 5,
+        opacity: isGap ? 0.5 : 0.95,
+        dashArray: isGap ? '4 7' : null
+      });
+      line.bindTooltip(
+        `${lsmSelectedHighway.name} — ${LSM_CLASS_LABELS[seg.c] || 'Unknown'} · ${seg.km} km`,
+        { sticky: true }
+      );
+      line.addTo(group);
+    });
+
+    group.addTo(map);
+    lsmHighwayLayerRef.current = group;
+
+    if (lsmSelectedHighway.bounds && lsmHighwayFlownRef.current !== lsmSelectedHighway.name) {
+      lsmHighwayFlownRef.current = lsmSelectedHighway.name;
+      map.flyToBounds(lsmSelectedHighway.bounds, { duration: 1.5, padding: [40, 40] });
+    }
+  }, [analysisMode, lsmSelectedHighway, lsmHighwaySegments, lsmBufferM]);
 
   // Click outside to close LSM dropdown and Mode dropdown
   useEffect(() => {
@@ -2497,6 +2586,87 @@ function App() {
     setToast({ message, isError });
     setTimeout(() => setToast(null), 4000);
   };
+
+  // Live highway analysis via backend (fallback when precomputed files are absent)
+  const fetchLiveHighwayStats = (name, bufferM) => {
+    return fetch(`${API_BASE}/api/highway-stats?name=${encodeURIComponent(name)}&buffer=${bufferM}`)
+      .then(async res => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "Highway analysis failed");
+        return data;
+      })
+      .then(data => {
+        const { segments, buffer_polygons, ...stats } = data;
+        setLsmSelectedHighway(prev =>
+          prev && prev.name === stats.name
+            ? { ...prev, ...stats, corridor: { ...prev.corridor, ...stats.corridor }, probability: { ...prev.probability, ...stats.probability } }
+            : stats
+        );
+        setLsmHighwaySegments({ segments, buffer_polygons, step_m: data.step_m });
+      });
+  };
+
+  const handleLsmHighwaySubmit = () => {
+    if (!lsmTempHighway) return;
+    const entry = (lsmHighwayStatsData || []).find(h => h.name === lsmTempHighway);
+    setLsmHighwayLoading(true);
+    setLsmHighwaySegments(null); // drop the previous highway's geometry while the new one loads
+    const done = () => setLsmHighwayLoading(false);
+
+    if (entry) {
+      setLsmSelectedHighway(entry);
+      // Precomputed map geometry (segments + buffer polygons), mirrors districts_geo/.
+      // The filename comes from the stats entry — names like "NH 752I" vs
+      // "NH 752i" collide case-insensitively, so it can't be derived here.
+      const segFile = entry.seg || `${sanitizeLsmFilename(lsmTempHighway)}.json`;
+      fetch(`${import.meta.env.BASE_URL}highway_segments/${segFile}`)
+        .then(res => { if (!res.ok) throw new Error("segments missing"); return res.json(); })
+        .then(data => setLsmHighwaySegments(data))
+        .catch(() =>
+          fetchLiveHighwayStats(lsmTempHighway, lsmBufferM).catch(() => {
+            setLsmHighwaySegments(null);
+            showToast("Highway map layers unavailable — showing statistics only", true);
+          })
+        )
+        .finally(done);
+    } else {
+      fetchLiveHighwayStats(lsmTempHighway, lsmBufferM)
+        .catch(err => showToast(err.message || "Highway analysis unavailable (backend offline)", true))
+        .finally(done);
+    }
+  };
+
+  const handleLsmHighwayClear = () => {
+    setLsmTempHighway('');
+    setLsmHighwayFilter('');
+    setLsmSelectedHighway(null);
+    setLsmHighwaySegments(null);
+    lsmHighwayFlownRef.current = null;
+
+    // Zoom back to India
+    if (mapRef.current) {
+      mapRef.current.fitBounds([
+        [7.874581612284692, 68.6315],
+        [37.0005, 97.2604328483906]
+      ]);
+    }
+  };
+
+  const handleLsmFocusTypeSwitch = (type) => {
+    if (type === lsmFocusType) return;
+    setLsmFocusType(type);
+    if (type === 'district' && lsmSelectedHighway) handleLsmHighwayClear();
+    if (type === 'highway' && lsmSelectedDistrict) handleLsmClearSelection();
+  };
+
+  // A live-computed result only carries the buffer width it was requested with;
+  // refetch when the user switches to a width it doesn't have yet.
+  useEffect(() => {
+    if (!lsmSelectedHighway) return;
+    if (lsmSelectedHighway.corridor && lsmSelectedHighway.corridor[String(lsmBufferM)]) return;
+    fetchLiveHighwayStats(lsmSelectedHighway.name, lsmBufferM)
+      .catch(() => showToast("Backend offline — no stats for this buffer width", true));
+  }, [lsmBufferM]);
 
   const updateDrawingLayer = (vertices, isPreview = false) => {
     const map = mapRef.current;
@@ -4810,6 +4980,26 @@ function App() {
             </div>
             <div className="card-body">
               <div className="form-group">
+                <label>Analysis Level</label>
+                <div className="lsm-focus-toggle">
+                  <button
+                    className={`radio-button ${lsmFocusType === 'district' ? 'active' : ''}`}
+                    onClick={() => handleLsmFocusTypeSwitch('district')}
+                  >
+                    District
+                  </button>
+                  <button
+                    className={`radio-button ${lsmFocusType === 'highway' ? 'active' : ''}`}
+                    onClick={() => handleLsmFocusTypeSwitch('highway')}
+                  >
+                    Highway
+                  </button>
+                </div>
+              </div>
+
+              {lsmFocusType === 'district' ? (
+              <>
+              <div className="form-group">
                 <label>State / UT</label>
                 <div className="custom-select">
                   <select value={lsmSelectedState} onChange={e => { setLsmSelectedState(e.target.value); setLsmTempDistrict(''); }}>
@@ -4823,8 +5013,8 @@ function App() {
               <div className="form-group">
                 <label>District</label>
                 <div className="custom-select">
-                  <select 
-                    value={lsmTempDistrict} 
+                  <select
+                    value={lsmTempDistrict}
                     onChange={e => setLsmTempDistrict(e.target.value)}
                     disabled={!lsmSelectedState}
                   >
@@ -4835,9 +5025,9 @@ function App() {
                   </select>
                 </div>
               </div>
-              
+
               <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                <button 
+                <button
                   className={`submit-btn-pill ${lsmTempDistrict && (!lsmSelectedDistrict || lsmSelectedDistrict.district !== lsmTempDistrict) ? 'active' : ''}`}
                   onClick={handleLsmSubmitFocus}
                   disabled={!lsmTempDistrict || (lsmSelectedDistrict && lsmSelectedDistrict.district === lsmTempDistrict)}
@@ -4845,7 +5035,7 @@ function App() {
                 >
                   Apply Focus
                 </button>
-                <button 
+                <button
                   className={`reset-btn-pill ${lsmSelectedDistrict ? 'active' : ''}`}
                   onClick={handleLsmClearSelection}
                   disabled={!lsmSelectedDistrict}
@@ -4854,12 +5044,82 @@ function App() {
                   Reset
                 </button>
               </div>
+              </>
+              ) : (
+              <>
+              <div className="form-group">
+                <label>Search Highway</label>
+                <input
+                  className="hwy-filter-input"
+                  type="text"
+                  placeholder="Type to filter — e.g. NH 44"
+                  value={lsmHighwayFilter}
+                  onChange={e => setLsmHighwayFilter(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>National Highway</label>
+                <div className="custom-select">
+                  <select
+                    value={lsmTempHighway}
+                    onChange={e => setLsmTempHighway(e.target.value)}
+                    disabled={!lsmHighwayOptions}
+                  >
+                    <option value="">{lsmHighwayOptions ? 'Select Highway' : 'Loading highways…'}</option>
+                    {lsmHighwayOptions && lsmHighwayOptions.nh.length > 0 && (
+                      <optgroup label="National Highways">
+                        {lsmHighwayOptions.nh.map(h => (
+                          <option key={h.name} value={h.name}>{h.name} · {Math.round(h.total_length_km)} km</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {lsmHighwayOptions && lsmHighwayOptions.other.length > 0 && (
+                      <optgroup label="Expressways & Other Roads">
+                        {lsmHighwayOptions.other.map(h => (
+                          <option key={h.name} value={h.name}>{h.name} · {Math.round(h.total_length_km)} km</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Corridor Buffer (each side)</label>
+                <div className="custom-select">
+                  <select value={lsmBufferM} onChange={e => setLsmBufferM(e.target.value)}>
+                    <option value="250">250 m</option>
+                    <option value="500">500 m</option>
+                    <option value="1000">1 km</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                <button
+                  className={`submit-btn-pill ${lsmTempHighway && (!lsmSelectedHighway || lsmSelectedHighway.name !== lsmTempHighway) ? 'active' : ''}`}
+                  onClick={handleLsmHighwaySubmit}
+                  disabled={!lsmTempHighway || lsmHighwayLoading || (lsmSelectedHighway && lsmSelectedHighway.name === lsmTempHighway)}
+                  style={{ flex: 1.5 }}
+                >
+                  {lsmHighwayLoading ? 'Analyzing…' : 'Apply Focus'}
+                </button>
+                <button
+                  className={`reset-btn-pill ${lsmSelectedHighway ? 'active' : ''}`}
+                  onClick={handleLsmHighwayClear}
+                  disabled={!lsmSelectedHighway}
+                  style={{ flex: 1, padding: '0.65rem 0' }}
+                >
+                  Reset
+                </button>
+              </div>
+              </>
+              )}
             </div>
           </div>
           )}
 
           {/* LSM SUSCEPTIBILITY OVERVIEW CARD */}
-          {analysisMode === "lsm" && (
+          {analysisMode === "lsm" && lsmFocusType === 'district' && (
           <div className="sidebar-card">
             <div className="card-header">
               <Activity className="icon" />
@@ -4892,12 +5152,127 @@ function App() {
           </div>
           )}
 
+          {/* LSM HIGHWAY RISK PROFILE CARD */}
+          {analysisMode === "lsm" && lsmFocusType === 'highway' && (
+          <div className="sidebar-card">
+            <div className="card-header">
+              <Activity className="icon" />
+              <h2>
+                HIGHWAY RISK PROFILE
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: '500', textTransform: 'none', letterSpacing: 'normal' }}>
+                  {lsmSelectedHighway ? `${lsmSelectedHighway.name} · ${lsmBufferM === '1000' ? '1 km' : `${lsmBufferM} m`} buffer` : 'No highway selected'}
+                </div>
+              </h2>
+            </div>
+            <div className="card-body">
+              {!lsmSelectedHighway ? (
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.55, margin: 0 }}>
+                  Select a National Highway and apply focus to analyse landslide susceptibility along its corridor —
+                  stretch-wise classes are drawn on the map and quantified here.
+                </p>
+              ) : (() => {
+                const buf = String(lsmBufferM);
+                const corridor = lsmSelectedHighway.corridor && lsmSelectedHighway.corridor[buf];
+                const prob = lsmSelectedHighway.probability && lsmSelectedHighway.probability[buf];
+                const lengths = lsmSelectedHighway.class_lengths_km || {};
+                const stats = lsmSelectedHighway.stats || {};
+                return (
+                  <>
+                    <div className="metric-grid" style={{ marginBottom: '12px' }}>
+                      <div className="metric metric-emph">
+                        <span className="metric-label">Total Length</span>
+                        <span className="metric-value">
+                          {Math.round(lsmSelectedHighway.total_length_km).toLocaleString()}
+                          <span className="metric-unit"> km</span>
+                        </span>
+                      </div>
+                      <div className="metric">
+                        <span className="metric-label">In Study Area</span>
+                        <span className="metric-value">
+                          {lsmSelectedHighway.analyzed_percentage}
+                          <span className="metric-unit"> %</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <DonutChart
+                      stats={stats}
+                      analyzedPercent={lsmSelectedHighway.analyzed_percentage}
+                      centerLabel="Length Analysed"
+                    />
+
+                    <div className="hwy-stack-bar" title="Composition of the analysed highway length">
+                      {[5, 4, 3, 2, 1].map(c => (stats[String(c)] > 0 && (
+                        <span
+                          key={c}
+                          style={{ width: `${stats[String(c)]}%`, background: LSM_CLASS_COLORS[c] }}
+                          title={`${LSM_CLASS_LABELS[c]}: ${stats[String(c)]}%`}
+                        />
+                      )))}
+                    </div>
+
+                    <table className="hwy-table">
+                      <thead>
+                        <tr>
+                          <th>Class</th>
+                          <th>Length</th>
+                          <th title="Share of the analysed highway length">% Length</th>
+                          <th title="Class composition of the buffered corridor area">% Corridor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[5, 4, 3, 2, 1].map(c => (
+                          <tr key={c}>
+                            <td>
+                              <span className="hwy-swatch" style={{ backgroundColor: LSM_CLASS_COLORS[c] }}></span>
+                              {LSM_CLASS_LABELS[c]}
+                            </td>
+                            <td>{(lengths[String(c)] ?? 0).toFixed(1)} km</td>
+                            <td>{(stats[String(c)] ?? 0).toFixed(1)}%</td>
+                            <td>{corridor ? `${(corridor.stats[String(c)] ?? 0).toFixed(1)}%` : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {lsmSelectedHighway.unanalyzed_km > 0 && (
+                      <div className="hwy-note">
+                        {lsmSelectedHighway.unanalyzed_km.toLocaleString()} km of this highway lies outside the
+                        susceptibility model's study area (dashed grey on the map).
+                      </div>
+                    )}
+
+                    {prob && (
+                      <div className="probability-stats-box">
+                        <div className="prob-stat-item">
+                          <span className="prob-stat-label">Min Prob</span>
+                          <span className="prob-stat-value">{prob.min.toFixed(4)}</span>
+                        </div>
+                        <div className="prob-stat-item">
+                          <span className="prob-stat-label">Mean Prob</span>
+                          <span className="prob-stat-value">{prob.mean.toFixed(4)}</span>
+                        </div>
+                        <div className="prob-stat-item">
+                          <span className="prob-stat-label">Max Prob</span>
+                          <span className="prob-stat-value">{prob.max.toFixed(4)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+          )}
+
 
           {/* LSM INFO BOX CARD */}
           {analysisMode === "lsm" && (
           <div className="info-box-card">
             <Activity className="icon-info" />
-            <p>This map shows landslide susceptibility based on environmental factor models and historic events. Double click to query susceptibility values at specific coordinates.</p>
+            <p>{lsmFocusType === 'highway'
+              ? 'Highway-wise analysis buffers the selected corridor and samples the susceptibility model along it: % Length is each class’s share of the analysed highway length, % Corridor its share of the buffered corridor area. Double click to query susceptibility at specific coordinates.'
+              : 'This map shows landslide susceptibility based on environmental factor models and historic events. Double click to query susceptibility values at specific coordinates.'}</p>
           </div>
           )}
 

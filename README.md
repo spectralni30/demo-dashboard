@@ -35,6 +35,15 @@ PhytoLens is a state-of-the-art geospatial dashboard designed for crop health mo
 *   Estimate actual evapotranspiration ($ET_a$) using the **SEBAL** energy balance model from Landsat thermal and optical inputs.
 *   Downloads hourly meteorological reanalysis data from **ECMWF ERA5-Land** (via Copernicus CDS API) for automatic calibration of dry and wet anchor pixels.
 
+### 6. Landslide Susceptibility (Disaster Management)
+*   **District-wise analysis** — select any state/district to see the 5-class susceptibility composition (Very Low → Very High), analysed-area share and probability statistics, with class/probability raster overlays for all of India.
+*   **National Highway-wise analysis** — select any of 1,000+ National Highways / expressways to analyse landslide exposure along its corridor:
+    *   Computes the highway's **total length** and generates a **buffer corridor** (250 m / 500 m / 1 km each side).
+    *   Overlays the corridor on the susceptibility model and reports the **length and percentage of the highway in each susceptibility class** (tabular + donut/stacked-bar charts), the corridor's area composition, and min/mean/max landslide probability.
+    *   Draws the highway on the map **coloured stretch-by-stretch by susceptibility class** together with the buffer outline, so vulnerable stretches can be located for mitigation and maintenance planning.
+    *   All analysis runs on the **full-resolution `INDIA_NATIONAL_HIGHWAY.geojson`** (repo root, ~100 MB, kept out of git) — never on simplified geometry, so winding mountain alignments keep their true length. The web map's orange overlay is generated from the same source for display (`backend/make_highway_overlay.py` → `highways_overlay.json`).
+    *   Statistics for every highway are precomputed (`backend/precompute_highway_stats.py` → `frontend/public/highway_stats.json` + `highway_segments/`), so the deployed app needs no rasters; a live endpoint (`/api/highway-stats`) recomputes on demand when the full-resolution rasters are available.
+
 ---
 
 ## 🚀 Getting Started

@@ -3257,3 +3257,103 @@ input[type="range"] {
 .query-card .pop-row:last-child {
   border-bottom: none;
 }
+
+/* --- Highway-wise LSM analysis --- */
+.lsm-focus-toggle {
+  display: flex;
+  gap: 8px;
+}
+.lsm-focus-toggle .radio-button {
+  flex: 1;
+  justify-content: center;
+  text-align: center;
+  padding: 8px 6px;
+  font-size: 0.72rem;
+}
+
+.hwy-filter-input {
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: border-color .15s, box-shadow .15s;
+}
+.hwy-filter-input:hover {
+  border-color: var(--text-3);
+}
+.hwy-filter-input:focus {
+  outline: none;
+  border-color: var(--accent-sky);
+  box-shadow: 0 0 0 3px var(--teal-tint);
+}
+.hwy-filter-input::placeholder {
+  color: var(--text-3);
+}
+
+.hwy-stack-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 12px 0 10px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-soft);
+}
+.hwy-stack-bar span {
+  display: block;
+  height: 100%;
+}
+
+.hwy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+  margin-top: 2px;
+}
+.hwy-table th {
+  text-align: left;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  font-weight: 700;
+  padding: 4px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.hwy-table td {
+  padding: 5px 4px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-soft);
+  font-variant-numeric: tabular-nums;
+}
+.hwy-table td:first-child {
+  color: var(--text-main);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.hwy-table tr:last-child td {
+  border-bottom: none;
+}
+.hwy-table td:not(:first-child),
+.hwy-table th:not(:first-child) {
+  text-align: right;
+}
+.hwy-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 6px;
+}
+
+.hwy-note {
+  font-size: 0.68rem;
+  color: var(--text-3);
+  margin-top: 8px;
+  line-height: 1.45;
+}

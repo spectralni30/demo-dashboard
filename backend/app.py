@@ -1989,6 +1989,61 @@ def get_lsm_district_stats(state: str = Query(...), district: str = Query(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- Highway-wise LSM analysis (live fallback; precomputed JSON is primary) ---
+# The full-resolution class raster (~111 m/px) is needed for meaningful
+# highway-corridor stats; class_small.tif (~3.2 km/px) is only a last resort.
+LSM_CLASS_FULL_TIF = os.environ.get('LSM_CLASS_FULL_TIF', 'S:\\LSM\\class.tif')
+
+# Analysis must run on the full-resolution NH dataset only — never on a
+# simplified/downscaled copy (it understates lengths on winding mountain roads).
+HIGHWAYS_GEOJSON_PATH = os.environ.get(
+    'HIGHWAYS_GEOJSON',
+    os.path.join(os.path.dirname(BASE_DIR), 'INDIA_NATIONAL_HIGHWAY.geojson')
+)
+
+lsm_class_full_dataset = None
+if os.path.exists(LSM_CLASS_FULL_TIF):
+    try:
+        import rasterio
+        lsm_class_full_dataset = rasterio.open(LSM_CLASS_FULL_TIF)
+        print("Opened LSM full-resolution class raster successfully.")
+    except Exception as e:
+        print(f"Error opening LSM full-resolution class raster: {e}")
+
+_highway_features_cache = None
+
+def _get_highway_features():
+    global _highway_features_cache
+    if _highway_features_cache is None:
+        from backend import highway_lsm
+        _highway_features_cache = highway_lsm.load_highway_features(HIGHWAYS_GEOJSON_PATH)
+    return _highway_features_cache
+
+@app.get("/api/highway-stats")
+def get_lsm_highway_stats(name: str = Query(...), buffer: int = Query(500)):
+    from backend import highway_lsm
+
+    class_ds = lsm_class_full_dataset if lsm_class_full_dataset is not None else lsm_class_dataset
+    if class_ds is None:
+        raise HTTPException(status_code=500, detail="LSM class raster not loaded. Make sure class.tif is present.")
+
+    try:
+        features = _get_highway_features()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not load highways.geojson: {e}")
+
+    feature = features.get(name)
+    if feature is None:
+        raise HTTPException(status_code=404, detail=f"Highway not found: {name}")
+
+    if buffer not in highway_lsm.BUFFERS_M:
+        buffer = 500
+
+    try:
+        return highway_lsm.analyze_highway(feature, class_ds, lsm_dataset, buffers_m=(buffer,))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/static/{filename}")
 def serve_static(filename: str):
     file_path = os.path.abspath(os.path.join(STATIC_DIR, filename))

@@ -27,3 +27,7 @@ xarray
 # numpy 1.x ABI and importing it under numpy 2 raises
 # "ValueError: numpy.dtype size changed" instead of a plain ImportError.
 netCDF4>=1.7.2
+# Highway-wise LSM analysis — corridor buffering/simplification for the
+# /api/highway-stats endpoint and the highway precompute script.
+shapely
+pyproj
