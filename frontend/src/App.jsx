@@ -2059,9 +2059,9 @@ function App() {
 
     const hl = L.geoJSON(feature, {
       style: {
-        color: '#0BAFAF',
+        color: '#0F66CF',
         weight: 3,
-        fillColor: '#0BAFAF',
+        fillColor: '#0F66CF',
         fillOpacity: 0.08,
         opacity: 0.85,
       },
@@ -2214,7 +2214,7 @@ function App() {
       || (climateLayersByNameRef.current.get(name) || [])[0]?.layer;
     if (layer && mapRef.current) {
       climateSelectedLayerRef.current = layer;
-      layer.setStyle({ weight: 2.4, color: "#0BAFAF" });
+      layer.setStyle({ weight: 2.4, color: "#0F66CF" });
       layer.bringToFront();
       if (climateSelectedLabelRef.current) mapRef.current.removeLayer(climateSelectedLabelRef.current);
       climateSelectedLabelRef.current = L.marker(layer.getBounds().getCenter(), {
@@ -2349,7 +2349,7 @@ function App() {
               }
             }
             climateHoveredLayerRef.current = lyr;
-            lyr.setStyle({ weight: 1.4, color: "#0BAFAF" });
+            lyr.setStyle({ weight: 1.4, color: "#0F66CF" });
             lyr.bringToFront();
             const { weekData, varId } = climateLiveRef.current;
             const V = CLIMATE_VARIABLES[varId];
@@ -2499,7 +2499,7 @@ function App() {
     }
     if (layer) {
       awdSelectedLayerRef.current = layer;
-      layer.setStyle({ weight: 2.0, color: '#0BAFAF' });
+      layer.setStyle({ weight: 2.0, color: '#0F66CF' });
       layer.bringToFront();
       if (mapRef.current) mapRef.current.fitBounds(layer.getBounds(), { maxZoom: 18, padding: [60, 60] });
     }
@@ -2518,7 +2518,7 @@ function App() {
     layer.setStyle({ weight: 3.0, color: '#ffd000' });
     layer.bringToFront();
     awdFlashTimerRef.current = setTimeout(() => {
-      layer.setStyle(awdSelectedLayerRef.current === layer ? { weight: 2.0, color: '#0BAFAF' } : { weight: 0.4, color: '#11161d' });
+      layer.setStyle(awdSelectedLayerRef.current === layer ? { weight: 2.0, color: '#0F66CF' } : { weight: 0.4, color: '#11161d' });
     }, 2200);
   };
 
@@ -2566,7 +2566,7 @@ function App() {
         lyr.on('click', () => selectAwdPlot(f.properties.FID));
         lyr.on('mouseover', () => lyr.setStyle({ weight: 1.6, color: '#ffffff' }));
         lyr.on('mouseout', () => {
-          lyr.setStyle(awdSelectedLayerRef.current === lyr ? { weight: 2.0, color: '#0BAFAF' } : { weight: 0.4, color: '#11161d' });
+          lyr.setStyle(awdSelectedLayerRef.current === lyr ? { weight: 2.0, color: '#0F66CF' } : { weight: 0.4, color: '#11161d' });
         });
       },
     });
@@ -4366,6 +4366,22 @@ function App() {
     if (g) selectFeature(g.features[0].value);   // jump to the group's first tool
   };
 
+  // Right-edge overlays (basemap selector, flood swipe label) must shift left
+  // when a docked right panel (results overlay / insights panel) is open.
+  const showResultsPanel =
+    (spectralResult && analysisMode === "single") ||
+    (timeSeriesResult && analysisMode === "timeseries") ||
+    (lulcResult && analysisMode === "lulc") ||
+    (aefResult && analysisMode === "aef") ||
+    (similarityResult && analysisMode === "similarity") ||
+    (floodResult && analysisMode === "flood") ||
+    (etSingleResult && analysisMode === "et") ||
+    (etSeriesResult && analysisMode === "et_timeseries");
+  const rightPanelInset =
+    (analysisMode === "climate" && climateWeekData) || (analysisMode === "awd" && awdData)
+      ? insightsPanelWidth
+      : (showResultsPanel && resultsPanelOpen ? resultsWidth : 0);
+
   return (
     <div className="app-viewport">
       
@@ -4412,7 +4428,7 @@ function App() {
       <header className="hud-header">
         <div className="hud-title" style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
           <span className="logo-chip">
-            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="PhytoLens Logo" className="hud-logo-img" />
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="SwanSat Logo" className="hud-logo-img" />
           </span>
         </div>
 
@@ -5216,7 +5232,7 @@ function App() {
 
                 {analysisMode === "single" ? (
                   <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                    <button onClick={() => runSpectralCalculation(true)} className="reset-btn-pill active py-2 text-xs flex-1">
+                    <button onClick={() => runSpectralCalculation(true)} className="btn-cyber btn-cyber-secondary py-2 text-xs flex-1">
                       Auto Stretch
                     </button>
                     <button onClick={() => runSpectralCalculation(false)} className="submit-btn-pill active py-2 text-xs flex-1">
@@ -5668,7 +5684,7 @@ function App() {
                   <div className="logo-icon" style={{ backgroundColor: 'var(--accent-sky)', width: '8px', height: '8px' }}></div>
                   <h2 style={{ color: 'var(--accent-sky)' }}>Point Query</h2>
                 </div>
-                <button style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem', padding: '0 4px', lineHeights: 1 }} onClick={() => {
+                <button style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem', padding: '0 4px', lineHeight: 1 }} onClick={() => {
                   setDefQuery(null);
                   if (defClickMarkerRef.current && mapRef.current) {
                     mapRef.current.removeLayer(defClickMarkerRef.current);
@@ -5841,8 +5857,7 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <input
                     type="text"
-                    className="custom-select"
-                    style={{ padding: '7px 9px' }}
+                    className="input-cyber"
                     placeholder="e.g. 3, 4, 10"
                     value={awdSearchText}
                     onChange={e => setAwdSearchText(e.target.value)}
@@ -5902,8 +5917,8 @@ function App() {
             <div id="leaflet-map" ref={mapContainerRef}></div>
 
             {/* Floating Basemap Selector Widget */}
-            <div className="floating-basemap-control">
-              <Layers size={11} style={{ color: 'var(--accent-sky, #0bafaf)' }} />
+            <div className="floating-basemap-control" style={{ right: rightPanelInset + 12 }}>
+              <Layers size={11} style={{ color: 'var(--accent-sky)' }} />
               <select
                 value={analysisMode === "climate" ? "light" : baseMap}
                 disabled={analysisMode === "climate"}
@@ -5923,7 +5938,7 @@ function App() {
               <div style={{ position: 'absolute', top: '58px', left: '12px', background: 'var(--panel-bg-strong)', color: 'var(--text-main)', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: 'var(--radius)', border: '1px solid rgba(224,62,62,0.4)', letterSpacing: '0.04em', textTransform: 'uppercase', backdropFilter: 'blur(6px)', boxShadow: 'var(--elev-2)' }}>
                 ◀ Post-event · {floodResult.post_date}
               </div>
-              <div style={{ position: 'absolute', top: '58px', right: '12px', background: 'var(--panel-bg-strong)', color: 'var(--text-main)', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: 'var(--radius)', border: '1px solid rgba(11,175,175,0.4)', letterSpacing: '0.04em', textTransform: 'uppercase', backdropFilter: 'blur(6px)', boxShadow: 'var(--elev-2)' }}>
+              <div style={{ position: 'absolute', top: '58px', right: rightPanelInset + 12, background: 'var(--panel-bg-strong)', color: 'var(--text-main)', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: 'var(--radius)', border: '1px solid rgba(15,102,207,0.4)', letterSpacing: '0.04em', textTransform: 'uppercase', backdropFilter: 'blur(6px)', boxShadow: 'var(--elev-2)' }}>
                 Pre-event · {floodResult.pre_date} ▶
               </div>
 
@@ -5976,13 +5991,11 @@ function App() {
                   mapRef.current.fitBounds([[minLat, minLon], [maxLat, maxLon]]);
                 }
               }
-            }} title="Reset Zoom to ROI bounds">
+            }} title="Recenter to ROI bounds" aria-label="Recenter to ROI bounds">
               <Compass size={18} />
-              <span>Compass</span>
             </button>
-            <button className="control-btn" onClick={handleLocateClient} title="Center GPS location">
-              <Target size={18} style={{ color: '#db2777' }} />
-              <span>Locate Me</span>
+            <button className="control-btn" onClick={handleLocateClient} title="Center GPS location" aria-label="Center GPS location">
+              <Target size={18} />
             </button>
             <button 
               className={`control-btn draw-edit ${isDrawing || drawMenuOpen ? 'active' : ''}`}
@@ -5994,9 +6007,9 @@ function App() {
                 }
               }}
               title="Toggle Drawing Tools"
+              aria-label="Toggle drawing tools"
             >
               <PenTool size={18} />
-              <span>Draw / Edit</span>
             </button>
 
             {/* Grab dots handle */}
@@ -6011,10 +6024,10 @@ function App() {
             <div className={`radial-draw-menu ${drawMenuOpen ? 'open' : ''}`}>
               {/* Precise SVG dashed line connecting circle centers in a single column */}
               <svg style={{ position: 'absolute', top: 0, left: 0, width: '120px', height: '120px', pointerEvents: 'none', zIndex: 0, overflow: 'visible' }}>
-                <line 
-                  x1="34" y1="-44" x2="34" y2="44" 
-                  stroke="rgba(100, 116, 139, 0.22)" 
-                  strokeWidth="1.2" 
+                <line
+                  x1="34" y1="-50" x2="34" y2="50"
+                  stroke="rgba(100, 116, 139, 0.22)"
+                  strokeWidth="1.2"
                   strokeDasharray="3 3"
                   style={{ 
                     opacity: drawMenuOpen ? 1 : 0, 
@@ -6032,7 +6045,7 @@ function App() {
                 title="Draw Polygon"
               >
                 <Hexagon size={18} className="poly-icon" />
-                <span>Shapes</span>
+                <span>Polygon</span>
               </button>
 
               <button 
@@ -6044,7 +6057,7 @@ function App() {
                 title="Draw Rectangle"
               >
                 <Square size={18} className="rect-icon" />
-                <span>Measure</span>
+                <span>Rectangle</span>
               </button>
 
               <button 
@@ -6055,8 +6068,8 @@ function App() {
                 }}
                 title="Draw Circle"
               >
-                <MapPin size={18} className="circle-icon" />
-                <span>Add Point</span>
+                <Circle size={18} className="circle-icon" />
+                <span>Circle</span>
               </button>
             </div>
           )}
@@ -6092,7 +6105,7 @@ function App() {
                   </div>
                   <div className="stat-card" style={{ borderTop: '3px solid #e8a317' }}>
                     <div className="stat-label">{V.hero.deficitLabel}</div>
-                    <div className="stat-val" style={{ color: 'var(--color-amber)' }}>{climateHeroStats.deficit}</div>
+                    <div className="stat-val" style={{ color: 'var(--color-amber-text)' }}>{climateHeroStats.deficit}</div>
                     <div className="metric-unit">{V.hero.deficitUnit}</div>
                   </div>
                 </div>
@@ -6244,14 +6257,7 @@ function App() {
           )}
 
           {/* FLOATING SIDEBAR RIGHT - RESULTS OVERLAY */}
-          {((spectralResult && analysisMode === "single") ||
-            (timeSeriesResult && analysisMode === "timeseries") ||
-            (lulcResult && analysisMode === "lulc") ||
-            (aefResult && analysisMode === "aef") ||
-            (similarityResult && analysisMode === "similarity") ||
-            (floodResult && analysisMode === "flood") ||
-            (etSingleResult && analysisMode === "et") ||
-            (etSeriesResult && analysisMode === "et_timeseries")) && (
+          {showResultsPanel && (
             <>
             <button 
               className={`results-toggle-btn ${!resultsPanelOpen ? 'collapsed' : ''}`}
@@ -7279,11 +7285,11 @@ function App() {
             <h3>MAP LEGEND</h3>
               {spectralResult && (
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '2px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', fontWeight: '600', color: 'var(--text-main)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '600', color: 'var(--text-main)' }}>
                     <span>{spectralIndex} Scale</span>
                   </div>
                   <div style={{ height: '8px', width: '100%', borderRadius: '2px', background: getPaletteGradientString() }}></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '8px', color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '10px', color: 'var(--text-muted)' }}>
                     <span>{visMin}</span>
                     <span>{((parseFloat(visMin) + parseFloat(visMax)) / 2).toFixed(1)}</span>
                     <span>{visMax}</span>
@@ -7292,11 +7298,11 @@ function App() {
               )}
               {analysisMode === "similarity" && similarityResult && (
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '2px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', fontWeight: '600', color: 'var(--text-main)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '600', color: 'var(--text-main)' }}>
                     <span>Cosine Similarity Scale</span>
                   </div>
                   <div style={{ height: '8px', width: '100%', borderRadius: '2px', background: getPaletteGradientString() }}></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '8px', color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '10px', color: 'var(--text-muted)' }}>
                     <span>{similarityResult.vis_min.toFixed(2)}</span>
                     <span>{((similarityResult.vis_min + similarityResult.vis_max) / 2).toFixed(2)}</span>
                     <span>{similarityResult.vis_max.toFixed(2)}</span>
@@ -7305,22 +7311,22 @@ function App() {
               )}
               {analysisMode === "flood" && floodResult && (
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '4px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '9px', fontWeight: '600', color: 'var(--text-main)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', fontWeight: '600', color: 'var(--text-main)' }}>
                     <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(239, 68, 68, 0.85)' }}></span>
                     <span>Candidate Flood (VV drop &gt; {(floodResult.stats?.threshold_db ?? 3).toFixed(1)} dB)</span>
                   </div>
-                  <div style={{ fontFamily: 'monospace', fontSize: '8px', color: 'var(--text-muted)' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: '10px', color: 'var(--text-muted)' }}>
                     {(floodResult.stats?.area_km2 ?? 0).toLocaleString()} km² · {(floodResult.stats?.percentage ?? 0).toFixed(2)}% of ROI
                   </div>
                 </div>
               )}
               {analysisMode === "et" && etSingleResult && (
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '2px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', fontWeight: '600', color: 'var(--text-main)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '600', color: 'var(--text-main)' }}>
                     <span>Actual ET (mm/day) · dry → wet</span>
                   </div>
                   <div style={{ height: '8px', width: '100%', borderRadius: '2px', background: `linear-gradient(90deg, ${get_color_palette(etPalette).join(', ')})` }}></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '8px', color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '10px', color: 'var(--text-muted)' }}>
                     <span>{Number(etSingleResult.vis_min).toFixed(1)}</span>
                     <span>{((Number(etSingleResult.vis_min) + Number(etSingleResult.vis_max)) / 2).toFixed(1)}</span>
                     <span>{Number(etSingleResult.vis_max).toFixed(1)}</span>
@@ -7329,21 +7335,21 @@ function App() {
               )}
               {analysisMode === "et_timeseries" && etSeriesResult && (
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '2px' }}>
-                  <div style={{ fontSize: '9px', fontWeight: '600', color: 'var(--text-main)' }}>
+                  <div style={{ fontSize: '10.5px', fontWeight: '600', color: 'var(--text-main)' }}>
                     <span>Seasonal ET trend — see chart</span>
                   </div>
-                  <div style={{ fontFamily: 'monospace', fontSize: '8px', color: 'var(--text-muted)' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: '10px', color: 'var(--text-muted)' }}>
                     {etSeriesResult.timeseries?.length || 0} scene(s) · mean ETa (mm/day)
                   </div>
                 </div>
               )}
               {analysisMode === "lsm" && activeLsmOverlay === "probability" && (
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '2px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', fontWeight: '600', color: 'var(--text-main)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '600', color: 'var(--text-main)' }}>
                     <span>Probability Heatmap (Turbo)</span>
                   </div>
                   <div style={{ height: '8px', width: '100%', borderRadius: '2px', background: 'linear-gradient(90deg, #30123b, #466be3, #28bbec, #32f197, #a2fc3c, #f2f221, #fc8961, #cf2547, #7a0403)' }}></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '8px', color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '10px', color: 'var(--text-muted)' }}>
                     <span>Very Low (0.0)</span>
                     <span>High (1.0)</span>
                   </div>
@@ -7351,11 +7357,11 @@ function App() {
               )}
               {analysisMode === "lsm" && activeLsmOverlay === "classes" && (
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '2px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', fontWeight: '600', color: 'var(--text-main)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '600', color: 'var(--text-main)' }}>
                     <span>Susceptibility Classes</span>
                   </div>
                   <div style={{ height: '8px', width: '100%', borderRadius: '2px', background: 'linear-gradient(90deg, #3b82f6, #10b981, #eab308, #f97316, #ef4444)' }}></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '8px', color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '10px', color: 'var(--text-muted)' }}>
                     <span>Class 1 (Very Low)</span>
                     <span>Class 5 (Very High)</span>
                   </div>
@@ -7365,11 +7371,11 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'row', width: '100%', gap: '8px', overflow: 'visible' }}>
                   {defVisibleLayers.has('asc') && (
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '2px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', fontWeight: '600', color: 'var(--text-main)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '600', color: 'var(--text-main)' }}>
                         <span>Ascending LOS (mm/yr)</span>
                       </div>
                       <div style={{ height: '6px', width: '100%', borderRadius: '2px', background: 'linear-gradient(90deg, #053061, #2166ac, #4393c3, #92c5de, #d1e5f0, #f7f7f7, #fddbc7, #f4a582, #d6604d, #b2182b, #67001f)' }}></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '8px', color: 'var(--text-muted)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '10px', color: 'var(--text-muted)' }}>
                         <span>-21.0</span>
                         <span>0</span>
                         <span>21.0</span>
@@ -7378,11 +7384,11 @@ function App() {
                   )}
                   {defVisibleLayers.has('dsc') && (
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '2px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', fontWeight: '600', color: 'var(--text-main)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '600', color: 'var(--text-main)' }}>
                         <span>Descending LOS (mm/yr)</span>
                       </div>
                       <div style={{ height: '6px', width: '100%', borderRadius: '2px', background: 'linear-gradient(90deg, #276419, #4d9221, #7fbc41, #b8e186, #e6f5d0, #f7f7f7, #fde0ef, #f1b2dc, #de77ae, #c51b7d, #8e0152)' }}></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '8px', color: 'var(--text-muted)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '10px', color: 'var(--text-muted)' }}>
                         <span>-21.0</span>
                         <span>0</span>
                         <span>21.0</span>
@@ -7418,9 +7424,9 @@ function App() {
                 }
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '2px' }}>
-                    <div style={{ fontSize: '9px', fontWeight: '600', color: 'var(--text-main)' }}>{vd.label}</div>
+                    <div style={{ fontSize: '10.5px', fontWeight: '600', color: 'var(--text-main)' }}>{vd.label}</div>
                     <div className="footer-gradient-bar" style={{ background: `linear-gradient(90deg, ${vd.colors.join(', ')})`, width: '100%' }}></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '8px', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '10px', color: 'var(--text-muted)' }}>
                       <span>{vd.min?.toFixed?.(1) ?? "—"}</span>
                       <span>{vd.max?.toFixed?.(1) ?? "—"}</span>
                     </div>
@@ -7441,15 +7447,15 @@ function App() {
                 href={`${API_BASE}${activeTiffUrl}`} 
                 download
                 className="submit-btn-pill active text-center decoration-none"
-                style={{ padding: '4px 8px', fontSize: '9px', width: 'auto', marginTop: '4px', display: 'inline-block' }}
+                style={{ padding: '4px 8px', fontSize: '10.5px', width: 'auto', marginTop: '4px', display: 'inline-block' }}
               >
                 Download TIFF
               </a>
             ) : (
-              <button 
+              <button
                 disabled
-                className="submit-btn-pill active"
-                style={{ padding: '2px 8px', fontSize: '9px', width: 'auto', marginTop: '4px', cursor: 'not-allowed', opacity: 0.5 }}
+                className="submit-btn-pill"
+                style={{ padding: '4px 8px', fontSize: '10.5px', width: 'auto', marginTop: '4px' }}
               >
                 Download TIFF
               </button>

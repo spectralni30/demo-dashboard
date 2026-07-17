@@ -77,3 +77,6 @@ aef_index.parquet
 
 # Public listing txt files
 *_public.txt
+
+# Local archive - exceeds GitHub's 100 MB limit, not needed to run the app
+demo-dashboard.zip
