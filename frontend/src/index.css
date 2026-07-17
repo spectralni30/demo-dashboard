@@ -1,104 +1,122 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100;200;300;400;500;600;700;800;900&family=Geist+Mono:wght@100;200;300;400;500;600;700;800;900&display=swap');
 
 :root {
-  --bg-primary: #f4f6f8;
-  --bg-sidebar: #f8fafb;
+  --bg-primary: #f4f4f4;
+  --bg-sidebar: #ffffff;
   --bg-card: #ffffff;
-  --border-color: #e4e8eb;
-  --text-main: #212b36;
-  --text-muted: #637381;
-  --accent-blue: #2d7ff9;
-  --accent-sky: #0BAFAF;
+  --border-color: #e0e0e0;
+  --text-main: #161616;
+  --text-muted: #525252;
+  --accent-blue: #0F66CF;
+  --accent-sky: #0F66CF;
 
-  --teal-dark: #088f8f;
-  --teal-tint: #e6f7f7;
-  --teal-tint-2: #d2f0f0;
-  --text-3: #919eab;
-  --border-soft: #eef1f3;
-  --radius: 4px;
-  --radius-lg: 8px;
+  --teal-dark: #0043ce;
+  --teal-tint: rgba(15, 102, 207, 0.08);
+  --teal-tint-2: rgba(15, 102, 207, 0.15);
+  --text-3: #8d8d8d;
+  --border-soft: #e0e0e0;
+  --radius: 0px;
+  --radius-lg: 0px;
 
   --bg-main: var(--bg-primary);
-  --bg-gradient: linear-gradient(180deg, #f4f6f8 0%, #e8ecef 100%);
-  --panel-bg: rgba(255, 255, 255, 0.9);
+  --bg-gradient: linear-gradient(180deg, #f4f4f4 0%, #e0e0e0 100%);
+  --panel-bg: rgba(255, 255, 255, 0.98);
   --border-cyan: var(--border-soft);
   --border-cyan-active: var(--accent-sky);
-  --glow-cyan: 0 0 0 3px var(--teal-tint);
-  --glow-cyan-strong: 0 0 0 4px var(--teal-tint-2);
+  --glow-cyan: 0 0 0 2px rgba(15, 102, 207, 0.15);
+  --glow-cyan-strong: 0 0 0 3px rgba(15, 102, 207, 0.25);
 
-  --elev-1: 0 1px 2px rgba(33, 43, 54, .06), 0 1px 3px rgba(33, 43, 54, .08);
-  --elev-2: 0 2px 4px rgba(33, 43, 54, .08), 0 1px 6px rgba(33, 43, 54, .06);
-  --elev-16: 0 8px 28px rgba(33, 43, 54, .18), 0 4px 10px rgba(33, 43, 54, .10);
-  --elev-24: 0 12px 36px rgba(33, 43, 54, .22);
+  --elev-1: none;
+  --elev-2: none;
+  --elev-16: none;
+  --elev-24: none;
 
   --color-cyan: var(--accent-sky);
-  --color-green: #1fa971;
-  --color-amber: #e8a317;
-  --color-red: #e03e3e;
+  --color-green: #24a148;
+  --color-amber: #f1c21b;
+  --color-red: #da1e28;
 
   --text-primary: var(--text-main);
-  --text-secondary: #4b5a65;
-  --font-mono: 'Roboto', system-ui, sans-serif;
-  --font-hud: 'Manrope', system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-sans: 'Manrope', system-ui, -apple-system, "Segoe UI", sans-serif;
+  --text-secondary: #525252;
+  --font-mono: 'Geist Mono', 'Roboto Mono', monospace;
+  --font-hud: 'Geist', -apple-system, sans-serif;
+  --font-sans: 'Geist', -apple-system, sans-serif;
 
   /* Surfaces & interaction states (theme-aware) */
-  --panel-bg-strong: rgba(255, 255, 255, 0.97);
+  --panel-bg-strong: #ffffff;
   --surface-solid: #ffffff;
-  --hover-bg: rgba(33, 43, 54, 0.05);
-  --track-bg: rgba(33, 43, 54, 0.06);
+  --hover-bg: rgba(15, 102, 207, 0.08);
+  --track-bg: rgba(0, 0, 0, 0.05);
 
   color-scheme: light;
 }
 
 /* =========================================================
-   DARK THEME  — applied via <html data-theme="dark">
-   Same cweb design system (teal accent, 4/8px radius, soft
-   elevation), just on dark neutral surfaces.
+   DARK THEME  — IBM Carbon style
    ========================================================= */
 [data-theme="dark"] {
-  --bg-primary: #12181d;
-  --bg-sidebar: #161d23;
-  --bg-card: #1b232a;
-  --border-color: #2a343c;
-  --text-main: #e4e8eb;
-  --text-muted: #8a97a1;
-  --accent-blue: #4c9aff;
-  --accent-sky: #17c9c9;
+  --bg-primary: #161616;
+  --bg-sidebar: #262626;
+  --bg-card: #262626;
+  --border-color: #393939;
+  --text-main: #f4f4f4;
+  --text-muted: #a8a8a8;
+  --accent-blue: #0F66CF;
+  --accent-sky: #4589ff;
 
-  --teal-dark: #0BAFAF;
-  --teal-tint: rgba(23, 201, 201, 0.14);
-  --teal-tint-2: rgba(23, 201, 201, 0.22);
-  --text-3: #6b7680;
-  --border-soft: #242e35;
+  --teal-dark: #0f62fe;
+  --teal-tint: rgba(15, 102, 207, 0.15);
+  --teal-tint-2: rgba(15, 102, 207, 0.25);
+  --text-3: #6f6f6f;
+  --border-soft: #353535;
 
   --bg-main: var(--bg-primary);
-  --bg-gradient: linear-gradient(180deg, #12181d 0%, #0b0f13 100%);
-  --panel-bg: rgba(22, 29, 35, 0.92);
+  --bg-gradient: linear-gradient(180deg, #161616 0%, #121212 100%);
+  --panel-bg: rgba(38, 38, 38, 0.98);
   --border-cyan: var(--border-soft);
   --border-cyan-active: var(--accent-sky);
-  --glow-cyan: 0 0 0 3px var(--teal-tint);
-  --glow-cyan-strong: 0 0 0 4px var(--teal-tint-2);
+  --glow-cyan: 0 0 0 2px rgba(69, 137, 255, 0.2);
+  --glow-cyan-strong: 0 0 0 3px rgba(69, 137, 255, 0.35);
 
-  --elev-1: 0 1px 2px rgba(0, 0, 0, .35), 0 1px 3px rgba(0, 0, 0, .3);
-  --elev-2: 0 2px 6px rgba(0, 0, 0, .4), 0 1px 8px rgba(0, 0, 0, .3);
-  --elev-16: 0 8px 28px rgba(0, 0, 0, .5), 0 4px 12px rgba(0, 0, 0, .35);
-  --elev-24: 0 12px 36px rgba(0, 0, 0, .55);
+  --elev-1: none;
+  --elev-2: none;
+  --elev-16: none;
+  --elev-24: none;
 
   --color-cyan: var(--accent-sky);
-  --color-green: #3ddc97;
-  --color-amber: #f5b94d;
-  --color-red: #f16565;
+  --color-green: #24a148;
+  --color-amber: #f1c21b;
+  --color-red: #da1e28;
 
   --text-primary: var(--text-main);
-  --text-secondary: #a9b4bd;
+  --text-secondary: #c6c6c6;
 
-  --panel-bg-strong: rgba(22, 29, 35, 0.97);
-  --surface-solid: #1b232a;
-  --hover-bg: rgba(255, 255, 255, 0.06);
-  --track-bg: rgba(255, 255, 255, 0.08);
+  --panel-bg-strong: #262626;
+  --surface-solid: #262626;
+  --hover-bg: rgba(69, 137, 255, 0.12);
+  --track-bg: rgba(255, 255, 255, 0.05);
 
   color-scheme: dark;
+}
+
+/* Global IBM Carbon sharp corners and shadowless overrides */
+*, *::before, *::after {
+  border-radius: 0px !important;
+  box-shadow: none !important;
+}
+
+/* Thin font weight for big headings */
+h1, h2, h3, h4, h5, h6, 
+.header-title, .title, .main-title, 
+.panel-title, .section-title, .big-heading,
+.panel-header h3, .panel-header h2, .sidebar-header h2,
+.insights-panel h2, .insights-panel h3 {
+  font-weight: 100 !important;
+  letter-spacing: -0.02em;
+}
+
+h3, h4, .section-title {
+  font-weight: 200 !important;
 }
 
 /* Dark-mode remaps for the Tailwind-style helper utilities */
