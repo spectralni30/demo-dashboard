@@ -2198,7 +2198,7 @@ input[type="range"] {
   border: 1px solid var(--border-soft);
   padding: 0 1rem;
   border-radius: 999px;
-  width: 280px;
+  width: 200px;
   height: 38px;
   box-shadow: var(--elev-2);
 }
@@ -2332,52 +2332,231 @@ input[type="range"] {
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  background: var(--panel-bg-strong);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-soft);
-  padding: 4px;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--elev-2);
+  align-items: center;
+  width: 48px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 8px 3px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .control-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius);
+  width: 42px;
+  height: 36px;
+  border-radius: 10px;
   background: transparent;
-  border: 0;
-  color: var(--text-secondary);
-  font-family: inherit;
-  font-size: 1.1rem;
-  font-weight: 500;
+  border: 1px solid transparent;
+  color: #64748b;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
+  font-family: inherit;
+  padding: 3px 0;
+  position: relative;
+  margin-bottom: 2px;
+}
+
+.control-btn span {
+  font-size: 7px;
+  font-weight: 700;
+  margin-top: 2px;
+  color: #64748b;
+  text-align: center;
+  line-height: 1.0;
+  white-space: normal;
+  width: 100%;
+  padding: 0 1px;
+}
+
+.control-btn svg {
+  width: 13px;
+  height: 13px;
 }
 
 .control-btn:hover {
-  background-color: var(--hover-bg);
-  color: var(--text-main);
+  background-color: #f1f5f9;
 }
 
-.control-btn.active {
-  background-color: var(--teal-tint);
-  color: var(--teal-dark);
+.control-btn:hover span {
+  color: #334155;
+}
+
+.control-btn.zoom-btn:hover::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background-color: #14b8a6;
+  border-radius: 99px;
+}
+
+.control-btn.draw-edit.active {
+  background-color: #edfcf7;
+  border-color: #99f6e4;
+  color: #0d9488;
+}
+
+.control-btn.draw-edit.active span {
+  color: #0d9488;
+}
+
+/* White triangle pointer pointing to radial menu */
+.control-btn.draw-edit.active::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 4px solid #ffffff;
+  z-index: 1001;
+  filter: drop-shadow(1px 0px 1px rgba(0, 0, 0, 0.05));
 }
 
 .control-divider {
   border: none;
-  border-top: 1px solid var(--border-soft);
-  margin: 4px 0;
-  width: 100%;
+  border-top: 1px solid #e2e8f0;
+  margin: 3px 0;
+  width: 80%;
 }
 
 .control-icon {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
+}
+
+/* Grab dots handle styling */
+.grab-dots {
+  display: grid;
+  grid-template-columns: repeat(3, 3px);
+  gap: 1.5px;
+  justify-content: center;
+  margin-top: 3px;
+  margin-bottom: 0px;
+  opacity: 0.35;
+}
+
+.grab-dots span {
+  width: 3px;
+  height: 3px;
+  background-color: #64748b;
+  border-radius: 50%;
+}
+
+/* Radial Drawing Menu styling */
+.radial-draw-menu {
+  position: absolute;
+  top: 12.1rem; /* Perfectly aligned vertically with Draw/Edit button center */
+  left: 4.5rem; /* Placed exactly to the right of the vertical toolbar */
+  z-index: 1000;
+  width: 1px;
+  height: 1px;
+}
+
+.radial-main-btn {
+  display: none;
+}
+
+.radial-child-btn {
+  position: absolute;
+  top: -21px; /* Centered relative to Draw/Edit horizontal line */
+  left: -21px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  color: #64748b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 15px -4px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 1;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.radial-child-btn span {
+  font-size: 6px;
+  font-weight: 700;
+  margin-top: 2px;
+  color: #64748b;
+}
+
+.radial-child-btn svg {
+  width: 11px;
+  height: 11px;
+}
+
+.radial-child-btn:hover {
+  background-color: #f8fafc;
+  transform: scale(1.05);
+}
+
+/* Open states with spring translations */
+.radial-draw-menu.open .radial-child-btn {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.radial-draw-menu.open .btn-poly {
+  transform: translate(34px, -44px);
+}
+
+.radial-draw-menu.open .btn-rect {
+  transform: translate(34px, 0px);
+}
+
+.radial-draw-menu.open .btn-circle {
+  transform: translate(34px, 44px);
+}
+
+/* Colors for active shape states */
+.radial-child-btn.btn-poly.active {
+  border: 1.5px solid #14b8a6;
+  background-color: #f0fdfa;
+}
+.radial-child-btn.btn-poly.active span {
+  color: #0d9488;
+}
+
+.radial-child-btn.btn-rect.active {
+  border: 1.5px solid #0ea5e9;
+  background-color: #f0f9ff;
+}
+.radial-child-btn.btn-rect.active span {
+  color: #0284c7;
+}
+
+.radial-child-btn.btn-circle.active {
+  border: 1.5px solid #8b5cf6;
+  background-color: #f5f3ff;
+}
+.radial-child-btn.btn-circle.active span {
+  color: #7c3aed;
+}
+
+/* Specific icon colors */
+.poly-icon {
+  color: #14b8a6;
+}
+.rect-icon {
+  color: #0ea5e9;
+}
+.circle-icon {
+  color: #8b5cf6;
 }
 
 /* Bottom Coordinates Overlay Pill */
@@ -2405,6 +2584,60 @@ input[type="range"] {
   width: 14px;
   height: 14px;
   color: var(--accent-sky);
+}
+
+/* Pulsing Search pin styling */
+.search-pin-wrapper {
+  position: relative;
+}
+
+.search-pin {
+  width: 12px;
+  height: 12px;
+  background-color: #ef4444;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px rgba(0,0,0,0.3);
+}
+
+.search-pin::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #ef4444;
+  border-radius: 50%;
+  animation: search-pin-pulse 1.6s infinite ease-out;
+}
+
+@keyframes search-pin-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(3.5);
+    opacity: 0;
+  }
+}
+
+/* Custom premium tooltip */
+.leaflet-tooltip.premium-tooltip {
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 4px 8px;
 }
 
 /* Footer */

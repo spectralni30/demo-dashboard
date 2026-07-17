@@ -35,7 +35,11 @@ import {
   CloudRain,
   Sprout,
   Search,
-  EyeOff
+  EyeOff,
+  Square,
+  Circle,
+  Hexagon,
+  Target
 } from 'lucide-react';
 
 const get_color_palette = (name) => {
@@ -934,8 +938,8 @@ function AwdDepthChart({ dates, depthCm }) {
     return <div className="chart-wrap" ref={containerRef} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontSize: '11px' }}>No depth history</div>;
   }
 
-  const height = 170;
-  const padL = 34, padR = 10, padT = 10, padB = 22;
+  const height = 180;
+  const padL = 48, padR = 10, padT = 10, padB = 28;
   const chartW = Math.max(50, width - padL - padR);
   const chartH = height - padT - padB;
 
@@ -949,9 +953,30 @@ function AwdDepthChart({ dates, depthCm }) {
   const linePath = depthCm.map((v, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(v ?? 0)}`).join(' ');
   const areaPath = `${linePath} L ${getX(dates.length - 1)} ${getY(0)} L ${getX(0)} ${getY(0)} Z`;
 
+  // Y-axis ticks (5 ticks from minY to maxY)
+  const yTicks = [0, 1, 2, 3, 4].map(i => minY + (i / 4) * (maxY - minY));
+
+
+
   return (
     <div className="chart-wrap" ref={containerRef}>
       <svg width={width} height={height} onMouseLeave={() => setHover(null)}>
+        {/* Y-axis gridlines */}
+        {yTicks.map((t, i) => (
+          <line key={`yg-${i}`} x1={padL} x2={padL + chartW} y1={getY(t)} y2={getY(t)} stroke="var(--border-soft)" strokeWidth="1" />
+        ))}
+        {/* Y-axis tick labels */}
+        {yTicks.map((t, i) => (
+          <text key={`yt-${i}`} x={padL - 6} y={getY(t) + 3} textAnchor="end" fontSize="9" fill="var(--text-3)">{t.toFixed(0)}</text>
+        ))}
+        {/* Y-axis title (rotated) */}
+        <text
+          x={12} y={padT + chartH / 2}
+          textAnchor="middle" fontSize="9.5" fontWeight="700" fill="var(--text-muted)"
+          transform={`rotate(-90, 12, ${padT + chartH / 2})`}
+        >Depth (cm)</text>
+
+        {/* Chart data */}
         <path d={areaPath} fill="var(--teal-tint)" stroke="none" />
         <path d={linePath} fill="none" stroke="var(--accent-sky)" strokeWidth="1.8" />
         {depthCm.map((v, i) => (
@@ -959,6 +984,15 @@ function AwdDepthChart({ dates, depthCm }) {
             fill="var(--accent-sky)" stroke="var(--bg-card)" strokeWidth="1"
             onMouseEnter={() => setHover(i)} style={{ cursor: 'pointer' }} />
         ))}
+
+
+        {/* X-axis title */}
+        <text
+          x={padL + chartW / 2} y={height - 2}
+          textAnchor="middle" fontSize="9.5" fontWeight="700" fill="var(--text-muted)"
+        >DAS (Date After Sowing)</text>
+
+        {/* Hit regions for hover */}
         {dates.map((d, i) => (
           <rect key={`hit-${i}`} x={getX(i) - (chartW / dates.length) / 2} y={padT} width={Math.max(4, chartW / dates.length)} height={chartH}
             fill="transparent" onMouseEnter={() => setHover(i)} />
@@ -1292,6 +1326,9 @@ function App() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawVertices, setDrawVertices] = useState([]);
   const drawVerticesRef = useRef([]);
+  const [drawShape, setDrawShape] = useState("polygon"); // "polygon" | "rectangle" | "circle"
+  const drawShapeRef = useRef("polygon");
+  const [drawMenuOpen, setDrawMenuOpen] = useState(false);
   const drawLineRef = useRef(null);
   const firstVertexMarkerRef = useRef(null); // Ref to closing circle marker
 
@@ -1415,6 +1452,39 @@ function App() {
     };
   }, [isResizing]);
 
+  // Dynamic Insights-panel (Climate + AWD right panel) Resize states
+  const [insightsPanelWidth, setInsightsPanelWidth] = useState(350);
+  const [isInsightsResizing, setIsInsightsResizing] = useState(false);
+
+  const startInsightsResize = (mouseDownEvent) => {
+    mouseDownEvent.preventDefault();
+    setIsInsightsResizing(true);
+  };
+
+  useEffect(() => {
+    if (!isInsightsResizing) return;
+
+    const handleMouseMove = (e) => {
+      const newWidth = window.innerWidth - e.clientX;
+      // Constrain insights panel width between 280px and 700px
+      if (newWidth >= 280 && newWidth <= 700) {
+        setInsightsPanelWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsInsightsResizing(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isInsightsResizing]);
+
 
   // App UI states
   const [loading, setLoading] = useState(false);
@@ -1442,11 +1512,16 @@ function App() {
   const baseTilesRef = useRef(null);
   const geoJsonLayerRef = useRef(null);
   const queryLayerRef = useRef(null);
+  const searchMarkerRef = useRef(null);
 
   // Sync drawVertices state with ref
   useEffect(() => {
     drawVerticesRef.current = drawVertices;
   }, [drawVertices]);
+
+  useEffect(() => {
+    drawShapeRef.current = drawShape;
+  }, [drawShape]);
 
   // Advance the loading-overlay stage indicators over time. There's no
   // real progress stream from the backend, so this simulates a plausible
@@ -2678,6 +2753,41 @@ function App() {
       .catch(() => showToast("Backend offline — no stats for this buffer width", true));
   }, [lsmBufferM]);
 
+  const destinationPoint = (lat, lng, distance, bearing) => {
+    const R = 6378137; // Earth's radius in meters
+    const d = distance / R;
+    const brng = (bearing * Math.PI) / 180;
+    const lat1 = (lat * Math.PI) / 180;
+    const lon1 = (lng * Math.PI) / 180;
+
+    const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng));
+    const lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+
+    return {
+      lat: (lat2 * 180) / Math.PI,
+      lng: (lon2 * 180) / Math.PI
+    };
+  };
+
+  const createGeoJSONCircle = (center, radiusMeters, points = 64) => {
+    const coordinates = [];
+    const [lat, lng] = center;
+    for (let i = 0; i < points; i++) {
+      const angle = (i * 360) / points;
+      const point = destinationPoint(lat, lng, radiusMeters, angle);
+      coordinates.push([point.lng, point.lat]);
+    }
+    coordinates.push(coordinates[0]); // close loop
+    return {
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [coordinates]
+      },
+      properties: {}
+    };
+  };
+
   const updateDrawingLayer = (vertices, isPreview = false) => {
     const map = mapRef.current;
     if (!map) return;
@@ -2691,25 +2801,49 @@ function App() {
     const drawFill = drawingTarget === "query" ? 'rgba(245,158,11,0.1)' : 'rgba(220,38,38,0.1)';
 
     if (vertices.length > 0) {
-      if (vertices.length >= 3 && !isPreview) {
-        drawLineRef.current = L.polygon(vertices, {
-          color: drawColor,
-          weight: 2.5,
-          fillColor: drawFill,
-          dashArray: null
-        }).addTo(map);
-      } else {
-        drawLineRef.current = L.polyline(vertices, {
-          color: drawColor,
-          weight: 2,
-          dashArray: '5, 5'
-        }).addTo(map);
+      if (drawShapeRef.current === "polygon") {
+        if (vertices.length >= 3 && !isPreview) {
+          drawLineRef.current = L.polygon(vertices, {
+            color: drawColor,
+            weight: 2.5,
+            fillColor: drawFill,
+            dashArray: null
+          }).addTo(map);
+        } else {
+          drawLineRef.current = L.polyline(vertices, {
+            color: drawColor,
+            weight: 2,
+            dashArray: '5, 5'
+          }).addTo(map);
+        }
+      } else if (drawShapeRef.current === "rectangle") {
+        if (vertices.length >= 2) {
+          drawLineRef.current = L.rectangle([vertices[0], vertices[1]], {
+            color: drawColor,
+            weight: 2,
+            fillColor: drawFill,
+            fillOpacity: 0.15,
+            dashArray: isPreview ? '5, 5' : null
+          }).addTo(map);
+        }
+      } else if (drawShapeRef.current === "circle") {
+        if (vertices.length >= 2) {
+          const radius = L.latLng(vertices[0]).distanceTo(vertices[1]);
+          drawLineRef.current = L.circle(vertices[0], {
+            radius: radius,
+            color: drawColor,
+            weight: 2,
+            fillColor: drawFill,
+            fillOpacity: 0.15,
+            dashArray: isPreview ? '5, 5' : null
+          }).addTo(map);
+        }
       }
     }
 
     const actualVertices = isPreview ? vertices.slice(0, -1) : vertices;
 
-    if (actualVertices.length >= 3) {
+    if (drawShapeRef.current === "polygon" && actualVertices.length >= 3) {
       if (!firstVertexMarkerRef.current) {
         firstVertexMarkerRef.current = L.circleMarker(actualVertices[0], {
           radius: 8,
@@ -2737,26 +2871,7 @@ function App() {
     }
   };
 
-  const finishDrawingPolygon = () => {
-    const vertices = drawVerticesRef.current;
-    if (vertices.length < 3) {
-      showToast("Please click at least 3 points to define a polygon.", true);
-      return;
-    }
-
-    // Create closed coordinates loop: [lon, lat] for GeoJSON
-    const coordinates = vertices.map(v => [v[1], v[0]]);
-    coordinates.push(coordinates[0]); // close loop
-
-    const geojson = {
-      type: "Feature",
-      geometry: {
-        type: "Polygon",
-        coordinates: [coordinates]
-      },
-      properties: {}
-    };
-
+  const saveDrawnGeometry = (geojson, bboxVertices) => {
     if (drawingTarget === "query") {
       let newGeojson;
       if (queryGeometry && queryGeometry.type === "FeatureCollection") {
@@ -2786,8 +2901,8 @@ function App() {
     }
 
     // Compute bounding box
-    const lons = vertices.map(v => v[1]);
-    const lats = vertices.map(v => v[0]);
+    const lons = bboxVertices.map(v => v[1]);
+    const lats = bboxVertices.map(v => v[0]);
     const minL = Math.min(...lons);
     const maxL = Math.max(...lons);
     const minT = Math.min(...lats);
@@ -2802,17 +2917,81 @@ function App() {
     setPointLon(parseFloat(((minL + maxL) / 2).toFixed(6)));
 
     setUploadedGeoJson(geojson);
-    setUploadedFileName("Drawn Polygon ROI");
+    const shapeLabel = drawShapeRef.current === "circle" ? "Circle" : (drawShapeRef.current === "rectangle" ? "Rectangle" : "Polygon");
+    setUploadedFileName(`Drawn ${shapeLabel} ROI`);
     setRoiMethod("file");
 
     stopDrawMode();
-    showToast("Custom polygon drawn successfully");
+    showToast(`Custom ${shapeLabel.toLowerCase()} drawn successfully`);
+  };
+
+  const finishDrawingPolygon = () => {
+    const vertices = drawVerticesRef.current;
+    if (vertices.length < 3) {
+      showToast("Please click at least 3 points to define a polygon.", true);
+      return;
+    }
+
+    // Create closed coordinates loop: [lon, lat] for GeoJSON
+    const coordinates = vertices.map(v => [v[1], v[0]]);
+    coordinates.push(coordinates[0]); // close loop
+
+    const geojson = {
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [coordinates]
+      },
+      properties: {}
+    };
+
+    saveDrawnGeometry(geojson, vertices);
+  };
+
+  const finishDrawingRectangle = (c1, c2) => {
+    const minLat = Math.min(c1[0], c2[0]);
+    const maxLat = Math.max(c1[0], c2[0]);
+    const minLng = Math.min(c1[1], c2[1]);
+    const maxLng = Math.max(c1[1], c2[1]);
+
+    const coordinates = [
+      [minLng, minLat],
+      [maxLng, minLat],
+      [maxLng, maxLat],
+      [minLng, maxLat],
+      [minLng, minLat]
+    ];
+
+    const geojson = {
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [coordinates]
+      },
+      properties: {}
+    };
+
+    saveDrawnGeometry(geojson, [c1, c2]);
+  };
+
+  const finishDrawingCircle = (center, radius) => {
+    const geojson = createGeoJSONCircle(center, radius, 64);
+    
+    const centerLatLng = L.latLng(center);
+    const bounds = centerLatLng.toBounds(radius);
+    const minLng = bounds.getWest();
+    const maxLng = bounds.getEast();
+    const minLat = bounds.getSouth();
+    const maxLat = bounds.getNorth();
+
+    saveDrawnGeometry(geojson, [[minLat, minLng], [maxLat, maxLng]]);
   };
 
   // Enable/disable draw mode on the map
-  const startDrawMode = (target = "roi") => {
+  const startDrawMode = (target = "roi", shape = "polygon") => {
     setIsDrawing(true);
     setDrawingTarget(target);
+    setDrawShape(shape);
     if (target === "roi") {
       setRoiMethod("draw");
       setUploadedGeoJson(null);
@@ -2823,12 +3002,19 @@ function App() {
       mapRef.current.getContainer().style.cursor = 'crosshair';
       mapRef.current.doubleClickZoom.disable();
     }
-    showToast(`Click on map to draw ${target === "roi" ? "ROI" : "Query Feature"} vertices. Click the first point to close.`);
+    if (shape === "polygon") {
+      showToast(`Click on map to draw polygon vertices. Click the first point or double click to close.`);
+    } else if (shape === "rectangle") {
+      showToast("Click on map to set the first corner of the rectangle, drag and click again to finish.");
+    } else if (shape === "circle") {
+      showToast("Click on map to set the center of the circle, drag and click again to finish.");
+    }
   };
 
   const stopDrawMode = () => {
     setIsDrawing(false);
     setDrawVertices([]);
+    setDrawMenuOpen(false);
     if (mapRef.current) {
       mapRef.current.getContainer().style.cursor = '';
       mapRef.current.doubleClickZoom.enable();
@@ -2851,22 +3037,43 @@ function App() {
     const onClick = (e) => {
       if (!isDrawing) return;
 
-      // Close polygon if clicking near first vertex
-      if (drawVerticesRef.current.length >= 3) {
-        const firstLatLng = L.latLng(drawVerticesRef.current[0]);
-        const p1 = map.latLngToLayerPoint(firstLatLng);
-        const p2 = map.latLngToLayerPoint(e.latlng);
-        const pixelDistance = p1.distanceTo(p2);
-        if (pixelDistance < 15) {
-          finishDrawingPolygon();
-          return;
+      if (drawShapeRef.current === "polygon") {
+        // Close polygon if clicking near first vertex
+        if (drawVerticesRef.current.length >= 3) {
+          const firstLatLng = L.latLng(drawVerticesRef.current[0]);
+          const p1 = map.latLngToLayerPoint(firstLatLng);
+          const p2 = map.latLngToLayerPoint(e.latlng);
+          const pixelDistance = p1.distanceTo(p2);
+          if (pixelDistance < 15) {
+            finishDrawingPolygon();
+            return;
+          }
+        }
+
+        const newVertex = [e.latlng.lat, e.latlng.lng];
+        const next = [...drawVerticesRef.current, newVertex];
+        setDrawVertices(next);
+        updateDrawingLayer(next);
+      } else if (drawShapeRef.current === "rectangle") {
+        if (drawVerticesRef.current.length === 0) {
+          const newVertex = [e.latlng.lat, e.latlng.lng];
+          const next = [newVertex];
+          setDrawVertices(next);
+          updateDrawingLayer(next);
+        } else if (drawVerticesRef.current.length === 1) {
+          finishDrawingRectangle(drawVerticesRef.current[0], [e.latlng.lat, e.latlng.lng]);
+        }
+      } else if (drawShapeRef.current === "circle") {
+        if (drawVerticesRef.current.length === 0) {
+          const newVertex = [e.latlng.lat, e.latlng.lng];
+          const next = [newVertex];
+          setDrawVertices(next);
+          updateDrawingLayer(next);
+        } else if (drawVerticesRef.current.length === 1) {
+          const radius = L.latLng(drawVerticesRef.current[0]).distanceTo(e.latlng);
+          finishDrawingCircle(drawVerticesRef.current[0], radius);
         }
       }
-
-      const newVertex = [e.latlng.lat, e.latlng.lng];
-      const next = [...drawVerticesRef.current, newVertex];
-      setDrawVertices(next);
-      updateDrawingLayer(next);
     };
 
     const onMouseMove = (e) => {
@@ -2878,7 +3085,9 @@ function App() {
     const onDblClick = (e) => {
       if (!isDrawing) return;
       e.originalEvent.stopPropagation();
-      finishDrawingPolygon();
+      if (drawShapeRef.current === "polygon") {
+        finishDrawingPolygon();
+      }
     };
 
     map.on('click', onClick);
@@ -2890,7 +3099,7 @@ function App() {
       map.off('mousemove', onMouseMove);
       map.off('dblclick', onDblClick);
     };
-  }, [isDrawing, drawingTarget]);
+  }, [isDrawing, drawingTarget, drawShape]);
 
   // Leaflet Map Setup
   useEffect(() => {
@@ -3090,6 +3299,36 @@ function App() {
     }
   };
 
+  const updateSearchMarker = (lat, lon, label = "") => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (searchMarkerRef.current) {
+      map.removeLayer(searchMarkerRef.current);
+      searchMarkerRef.current = null;
+    }
+
+    if (lat != null && lon != null) {
+      searchMarkerRef.current = L.marker([lat, lon], {
+        icon: L.divIcon({
+          className: 'search-pin-wrapper',
+          html: `<div class="search-pin"></div>`,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10]
+        })
+      })
+      .addTo(map);
+
+      if (label) {
+        searchMarkerRef.current.bindTooltip(label, { 
+          permanent: true, 
+          direction: 'top', 
+          className: 'premium-tooltip' 
+        }).openTooltip();
+      }
+    }
+  };
+
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (!searchCoords) return;
@@ -3098,10 +3337,35 @@ function App() {
       const [lat, lon] = parts;
       if (mapRef.current) {
         mapRef.current.setView([lat, lon], 12);
+        updateSearchMarker(lat, lon, `Coords: ${lat.toFixed(5)}, ${lon.toFixed(5)}`);
         showToast(`Centered map at Lat: ${lat}, Lon: ${lon}`);
       }
     } else {
-      showToast("Format must be 'lat, lon'", true);
+      // Nominatim search query geocoding
+      const query = encodeURIComponent(searchCoords.trim());
+      showToast(`Searching for "${searchCoords}"...`);
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.length > 0) {
+            const firstResult = data[0];
+            const lat = parseFloat(firstResult.lat);
+            const lon = parseFloat(firstResult.lon);
+            const displayName = firstResult.display_name;
+            const shortName = firstResult.name || displayName.split(',')[0];
+            if (mapRef.current) {
+              mapRef.current.setView([lat, lon], 12);
+              updateSearchMarker(lat, lon, shortName);
+              showToast(`Found: ${displayName}`);
+            }
+          } else {
+            showToast(`No results found for "${searchCoords}"`, true);
+          }
+        })
+        .catch(err => {
+          console.error("Geocoding error:", err);
+          showToast("Search failed (check network connection or place name)", true);
+        });
     }
   };
 
@@ -4319,11 +4583,11 @@ function App() {
                   <Upload size={13} /> Upload
                 </button>
                 <button
-                  onClick={isDrawing ? stopDrawMode : () => startDrawMode("roi")}
+                  onClick={isDrawing ? stopDrawMode : () => startDrawMode("roi", "polygon")}
                   className={`radio-button flex-1 justify-center ${roiMethod === 'draw' ? 'active' : ''} ${isDrawing ? 'active' : ''}`}
                   style={{ padding: '8px 0', fontSize: '11px', gap: '6px' }}
                 >
-                  <PenTool size={13} /> {isDrawing ? 'Drawing...' : 'Draw'}
+                  <PenTool size={13} /> {isDrawing ? `Drawing ${drawShape}...` : 'Draw'}
                 </button>
               </div>
 
@@ -4345,7 +4609,9 @@ function App() {
                   {isDrawing ? (
                     <>
                       <span className="badge-pulse"></span>
-                      <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">Click on map to draw polygon vertices</span>
+                      <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">
+                        {drawShape === 'polygon' ? 'Click map to draw polygon' : (drawShape === 'rectangle' ? 'Click corners to draw rectangle' : 'Click center and edge to draw circle')}
+                      </span>
                       <button onClick={stopDrawMode} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-red)', padding: '2px' }}>
                         <X size={14} />
                       </button>
@@ -4588,11 +4854,11 @@ function App() {
                 <label>Query Feature Geometry</label>
                 <div className="flex flex-col gap-2">
                   <button
-                    onClick={isDrawing ? stopDrawMode : () => startDrawMode("query")}
+                    onClick={isDrawing ? stopDrawMode : () => startDrawMode("query", "polygon")}
                     className={`radio-button w-full justify-center ${drawingTarget === 'query' && isDrawing ? 'active' : ''}`}
                     style={{ padding: '8px 0', fontSize: '11px', gap: '6px' }}
                   >
-                    <PenTool size={13} /> {drawingTarget === 'query' && isDrawing ? 'Drawing Feature...' : 'Draw Query Feature'}
+                    <PenTool size={13} /> {drawingTarget === 'query' && isDrawing ? `Drawing ${drawShape}...` : 'Draw Query Feature'}
                   </button>
 
                   <div className="flex items-center gap-2 text-[9px] text-slate-600 uppercase tracking-wider">
@@ -5693,7 +5959,7 @@ function App() {
               </svg>
               <input 
                 type="text" 
-                placeholder="Search coords (lat, lon)..." 
+                placeholder="Search place name or coords (lat, lon)..." 
                 value={searchCoords}
                 onChange={e => setSearchCoords(e.target.value)}
               />
@@ -5702,9 +5968,6 @@ function App() {
 
           {/* Custom Vertical Map Controls on the Right */}
           <div className="custom-map-controls">
-            <button className="control-btn" onClick={() => mapRef.current?.zoomIn()} title="Zoom In">+</button>
-            <button className="control-btn" onClick={() => mapRef.current?.zoomOut()} title="Zoom Out">-</button>
-            <div className="control-divider"></div>
             <button className="control-btn" onClick={() => {
               if (mapRef.current) {
                 if (roiMethod === "file" && geoJsonLayerRef.current) {
@@ -5714,15 +5977,89 @@ function App() {
                 }
               }
             }} title="Reset Zoom to ROI bounds">
-              <Compass size={14} className="control-icon" />
+              <Compass size={18} />
+              <span>Compass</span>
             </button>
             <button className="control-btn" onClick={handleLocateClient} title="Center GPS location">
-              <span style={{ fontSize: '13px' }}>🎯</span>
+              <Target size={18} style={{ color: '#db2777' }} />
+              <span>Locate Me</span>
             </button>
-            <button className="control-btn" onClick={toggleFullscreen} title="Toggle Map Fullscreen">
-              <span style={{ fontSize: '13px' }}>{isFullscreen ? "🗜" : "📺"}</span>
+            <button 
+              className={`control-btn draw-edit ${isDrawing || drawMenuOpen ? 'active' : ''}`}
+              onClick={() => {
+                if (isDrawing) {
+                  stopDrawMode();
+                } else {
+                  setDrawMenuOpen(!drawMenuOpen);
+                }
+              }}
+              title="Toggle Drawing Tools"
+            >
+              <PenTool size={18} />
+              <span>Draw / Edit</span>
             </button>
+
+            {/* Grab dots handle */}
+            <div className="grab-dots">
+              <span></span><span></span><span></span>
+              <span></span><span></span><span></span>
+            </div>
           </div>
+
+          {/* Radial Drawing Menu Overlay */}
+          {analysisMode !== "climate" && analysisMode !== "awd" && (
+            <div className={`radial-draw-menu ${drawMenuOpen ? 'open' : ''}`}>
+              {/* Precise SVG dashed line connecting circle centers in a single column */}
+              <svg style={{ position: 'absolute', top: 0, left: 0, width: '120px', height: '120px', pointerEvents: 'none', zIndex: 0, overflow: 'visible' }}>
+                <line 
+                  x1="34" y1="-44" x2="34" y2="44" 
+                  stroke="rgba(100, 116, 139, 0.22)" 
+                  strokeWidth="1.2" 
+                  strokeDasharray="3 3"
+                  style={{ 
+                    opacity: drawMenuOpen ? 1 : 0, 
+                    transition: 'opacity 0.3s ease' 
+                  }}
+                />
+              </svg>
+
+              <button 
+                className={`radial-child-btn btn-poly ${isDrawing && drawShape === "polygon" ? 'active' : ''}`}
+                onClick={() => {
+                  const target = (analysisMode === "lsm" || analysisMode === "deformation" || analysisMode === "similarity") ? "query" : "roi";
+                  startDrawMode(target, "polygon");
+                }}
+                title="Draw Polygon"
+              >
+                <Hexagon size={18} className="poly-icon" />
+                <span>Shapes</span>
+              </button>
+
+              <button 
+                className={`radial-child-btn btn-rect ${isDrawing && drawShape === "rectangle" ? 'active' : ''}`}
+                onClick={() => {
+                  const target = (analysisMode === "lsm" || analysisMode === "deformation" || analysisMode === "similarity") ? "query" : "roi";
+                  startDrawMode(target, "rectangle");
+                }}
+                title="Draw Rectangle"
+              >
+                <Square size={18} className="rect-icon" />
+                <span>Measure</span>
+              </button>
+
+              <button 
+                className={`radial-child-btn btn-circle ${isDrawing && drawShape === "circle" ? 'active' : ''}`}
+                onClick={() => {
+                  const target = (analysisMode === "lsm" || analysisMode === "deformation" || analysisMode === "similarity") ? "query" : "roi";
+                  startDrawMode(target, "circle");
+                }}
+                title="Draw Circle"
+              >
+                <MapPin size={18} className="circle-icon" />
+                <span>Add Point</span>
+              </button>
+            </div>
+          )}
 
           {/* Coordinate Overlay Tracker (bottom right) */}
           <div className="coordinate-overlay-pill">
@@ -5741,7 +6078,12 @@ function App() {
             const cat = rec?.[V.fields.category] || "No Data";
             const catColorVal = climateCatColor(climateVar, cat);
             return (
-              <div className="insights-panel">
+              <div className="insights-panel" style={{ width: insightsPanelWidth }}>
+                <div 
+                  className="resize-handle" 
+                  onMouseDown={startInsightsResize} 
+                  title="Drag to resize panel width"
+                />
                 <div className="stats-grid">
                   <div className="stat-card" style={{ borderTop: '3px solid #2d7ff9' }}>
                     <div className="stat-label">{V.hero.surplusLabel}</div>
@@ -5819,7 +6161,12 @@ function App() {
           })()}
 
           {analysisMode === "awd" && awdData && (
-            <div className="insights-panel">
+            <div className="insights-panel" style={{ width: insightsPanelWidth }}>
+              <div 
+                className="resize-handle" 
+                onMouseDown={startInsightsResize} 
+                title="Drag to resize panel width"
+              />
               <div className="sidebar-card">
                 <div className="card-header">
                   <Sprout className="icon" />
